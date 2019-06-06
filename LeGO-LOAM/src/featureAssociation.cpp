@@ -752,7 +752,7 @@ public:
         Vector3D v( (pi->x - tx), (pi->y - ty), (pi->z - tz) );
         Vector3D v1 = RotateRoll(v, -rz);
         Vector3D v2 = RotatePitch(v1, -rx);
-        Vector3D v3 = RotatePitch(v2, -ry);
+        Vector3D v3 = RotateYaw(v2, -ry);
 
         po->x = v3.x();
         po->y = v3.y();
