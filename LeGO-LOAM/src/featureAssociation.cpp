@@ -332,21 +332,13 @@ public:
 
     void TransformToStartIMU(PointType *p)
     {
-        float x1 = cos(imuRollCur) * p->x - sin(imuRollCur) * p->y;
-        float y1 = sin(imuRollCur) * p->x + cos(imuRollCur) * p->y;
-        float z1 = p->z;
+        Vector3D v1 = RotateRoll( {p->x, p->y, p->z} , imuRollCur);
+        Vector3D v2 = RotatePitch(v1, imuPitchCur);
+        Vector3D v3 = RotateYaw(v2, imuYawCur);
 
-        float x2 = x1;
-        float y2 = cos(imuPitchCur) * y1 - sin(imuPitchCur) * z1;
-        float z2 = sin(imuPitchCur) * y1 + cos(imuPitchCur) * z1;
-
-        float x3 = cos(imuYawCur) * x2 + sin(imuYawCur) * z2;
-        float y3 = y2;
-        float z3 = -sin(imuYawCur) * x2 + cos(imuYawCur) * z2;
-
-        float x4 = cosImuYawStart * x3 - sinImuYawStart * z3;
-        float y4 = y3;
-        float z4 = sinImuYawStart * x3 + cosImuYawStart * z3;
+        float x4 = cosImuYawStart * v3.x() - sinImuYawStart * v3.z();
+        float y4 = v3.y();
+        float z4 = sinImuYawStart * v3.x() + cosImuYawStart * v3.z();
 
         float x5 = x4;
         float y5 = cosImuPitchStart * y4 + sinImuPitchStart * z4;
@@ -365,17 +357,9 @@ public:
 
         Vector3D acc = imuAcc[imuPointerLast];
 
-        float x1 = cos(roll) * acc.x() - sin(roll) * acc.y();
-        float y1 = sin(roll) * acc.x() + cos(roll) * acc.y();
-        float z1 = acc.z();
-
-        float x2 = x1;
-        float y2 = cos(pitch) * y1 - sin(pitch) * z1;
-        float z2 = sin(pitch) * y1 + cos(pitch) * z1;
-
-        acc.x() = cos(yaw) * x2 + sin(yaw) * z2;
-        acc.y() = y2;
-        acc.z() = -sin(yaw) * x2 + cos(yaw) * z2;
+        Vector3D v1 = RotateRoll( acc, roll );
+        Vector3D v2 = RotatePitch( v1, pitch );
+        acc =  RotateYaw( v2, yaw );
 
         int imuPointerBack = (imuPointerLast + imuQueLength - 1) % imuQueLength;
         double timeDiff = imuTime[imuPointerLast] - imuTime[imuPointerBack];
@@ -754,47 +738,6 @@ public:
 	    }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     void TransformToStart(PointType const * const pi, PointType * const po)
     {
         float s = 10 * (pi->intensity - int(pi->intensity));
@@ -806,17 +749,14 @@ public:
         float ty = s * transformCur[4];
         float tz = s * transformCur[5];
 
-        float x1 = cos(rz) * (pi->x - tx) + sin(rz) * (pi->y - ty);
-        float y1 = -sin(rz) * (pi->x - tx) + cos(rz) * (pi->y - ty);
-        float z1 = (pi->z - tz);
+        Vector3D v( (pi->x - tx), (pi->y - ty), (pi->z - tz) );
+        Vector3D v1 = RotateRoll(v, -rz);
+        Vector3D v2 = RotatePitch(v1, -rx);
+        Vector3D v3 = RotatePitch(v2, -ry);
 
-        float x2 = x1;
-        float y2 = cos(rx) * y1 + sin(rx) * z1;
-        float z2 = -sin(rx) * y1 + cos(rx) * z1;
-
-        po->x = cos(ry) * x2 - sin(ry) * z2;
-        po->y = y2;
-        po->z = sin(ry) * x2 + cos(ry) * z2;
+        po->x = v3.x();
+        po->y = v3.y();
+        po->z = v3.z();
         po->intensity = pi->intensity;
     }
 
@@ -831,17 +771,10 @@ public:
         float ty = s * transformCur[4];
         float tz = s * transformCur[5];
 
-        float x1 = cos(rz) * (pi->x - tx) + sin(rz) * (pi->y - ty);
-        float y1 = -sin(rz) * (pi->x - tx) + cos(rz) * (pi->y - ty);
-        float z1 = (pi->z - tz);
-
-        float x2 = x1;
-        float y2 = cos(rx) * y1 + sin(rx) * z1;
-        float z2 = -sin(rx) * y1 + cos(rx) * z1;
-
-        float x3 = cos(ry) * x2 - sin(ry) * z2;
-        float y3 = y2;
-        float z3 = sin(ry) * x2 + cos(ry) * z2;
+        Vector3D v( (pi->x - tx), (pi->y - ty), (pi->z - tz) );
+        Vector3D v1 = RotateRoll(v, -rz);
+        Vector3D v2 = RotatePitch(v1, -rx);
+        Vector3D v3 = RotateYaw(v2, -ry);
 
         rx = transformCur[0];
         ry = transformCur[1];
@@ -850,23 +783,18 @@ public:
         ty = transformCur[4];
         tz = transformCur[5];
 
-        float x4 = cos(ry) * x3 + sin(ry) * z3;
-        float y4 = y3;
-        float z4 = -sin(ry) * x3 + cos(ry) * z3;
+        Vector3D v4 = RotateYaw(v3, ry);
+        Vector3D v5 = RotatePitch(v4, rx);
+        Vector3D v6 = RotateRoll(v5, rz);
+        v6 += Vector3D( tx,ty,tx ) - imuShiftFromStart;
 
-        float x5 = x4;
-        float y5 = cos(rx) * y4 - sin(rx) * z4;
-        float z5 = sin(rx) * y4 + cos(rx) * z4;
+        float x6 = v6.x() + tx - imuShiftFromStart.x();
+        float y6 = v6.y() + ty - imuShiftFromStart.y();
+        float z6 = v6.z() + tz - imuShiftFromStart.z();
 
-        float x6 = cos(rz) * x5 - sin(rz) * y5 + tx;
-        float y6 = sin(rz) * x5 + cos(rz) * y5 + ty;
-        float z6 = z5 + tz;
-
-        float x7 = cosImuRollStart * (x6 - imuShiftFromStart.x())
-                 - sinImuRollStart * (y6 - imuShiftFromStart.y());
-        float y7 = sinImuRollStart * (x6 - imuShiftFromStart.x())
-                 + cosImuRollStart * (y6 - imuShiftFromStart.y());
-        float z7 = z6 - imuShiftFromStart.z();
+        float x7 = cosImuRollStart * x6  - sinImuRollStart * y6;
+        float y7 = sinImuRollStart * x6  + cosImuRollStart * y6;
+        float z7 = z6;
 
         float x8 = x7;
         float y8 = cosImuPitchStart * y7 - sinImuPitchStart * z7;
@@ -876,17 +804,13 @@ public:
         float y9 = y8;
         float z9 = -sinImuYawStart * x8 + cosImuYawStart * z8;
 
-        float x10 = cos(imuYawLast) * x9 - sin(imuYawLast) * z9;
-        float y10 = y9;
-        float z10 = sin(imuYawLast) * x9 + cos(imuYawLast) * z9;
+        Vector3D v10 = RotateYaw( {x9,y9,z9}, ry);
+        Vector3D v11 = RotatePitch(v10, rx);
+        Vector3D v12 = RotateRoll(v11, rz);
 
-        float x11 = x10;
-        float y11 = cos(imuPitchLast) * y10 + sin(imuPitchLast) * z10;
-        float z11 = -sin(imuPitchLast) * y10 + cos(imuPitchLast) * z10;
-
-        po->x = cos(imuRollLast) * x11 + sin(imuRollLast) * y11;
-        po->y = -sin(imuRollLast) * x11 + cos(imuRollLast) * y11;
-        po->z = z11;
+        po->x = v12.x();
+        po->y = v12.y();
+        po->z = v12.z();
         po->intensity = int(pi->intensity);
     }
 
@@ -1633,19 +1557,14 @@ public:
         AccumulateRotation(transformSum[0], transformSum[1], transformSum[2], 
                            -transformCur[0], -transformCur[1], -transformCur[2], rx, ry, rz);
 
-        float x1 = cos(rz) * (transformCur[3] - imuShiftFromStart.x())
-                 - sin(rz) * (transformCur[4] - imuShiftFromStart.y());
-        float y1 = sin(rz) * (transformCur[3] - imuShiftFromStart.x())
-                 + cos(rz) * (transformCur[4] - imuShiftFromStart.y());
-        float z1 = transformCur[5] - imuShiftFromStart.z();
+        Vector3D v( transformCur[3], transformCur[4], transformCur[5] );
+        Vector3D v1 = RotateRoll( v - imuShiftFromStart, rz );
+        Vector3D v2 = RotatePitch( v1, rx );
+        Vector3D v3 = RotateYaw( v2, ry );
 
-        float x2 = x1;
-        float y2 = cos(rx) * y1 - sin(rx) * z1;
-        float z2 = sin(rx) * y1 + cos(rx) * z1;
-
-        tx = transformSum[3] - (cos(ry) * x2 + sin(ry) * z2);
-        ty = transformSum[4] - y2;
-        tz = transformSum[5] - (-sin(ry) * x2 + cos(ry) * z2);
+        tx = transformSum[3] - v3.x();
+        ty = transformSum[4] - v3.y();
+        tz = transformSum[5] - v3.z();
 
         PluginIMURotation(rx, ry, rz, imuPitchStart, imuYawStart, imuRollStart, 
                           imuPitchLast, imuYawLast, imuRollLast, rx, ry, rz);

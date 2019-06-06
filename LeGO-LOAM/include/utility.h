@@ -158,4 +158,37 @@ typedef Eigen::Vector3f Vector3D;
 
 typedef PointXYZIRPYT  PointTypePose;
 
+inline Vector3D RotateRoll(const Vector3D& v, float roll)
+{
+    float Cos = cosf(roll);
+    float Sin = sinf(roll);
+    float x = Cos * v.x() - Sin * v.y();
+    float y = Sin * v.x() + Cos * v.y();
+    float z = v.z();
+    return {x,y,z};
+}
+
+inline Vector3D RotatePitch(const Vector3D& v, float pitch)
+{
+    float Cos = cosf(pitch);
+    float Sin = sinf(pitch);
+    float x = v.x();
+    float y = Cos * v.y() - Sin * v.z();
+    float z = Sin * v.y() + Cos * v.z();
+    return {x,y,z};
+}
+
+
+inline Vector3D RotateYaw(const Vector3D& v, float yaw)
+{
+    float Cos = cosf(yaw);
+    float Sin = sinf(yaw);
+    float x = Cos * v.x() + Sin * v.z();
+    float y = v.y();
+    float z = -Sin * v.x() + Cos * v.z();
+    return {x,y,z};
+}
+
+
+
 #endif
