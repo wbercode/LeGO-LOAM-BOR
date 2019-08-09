@@ -199,59 +199,58 @@ public:
 
     void projectPointCloud(){
         // range image projection
-        float verticalAngle, horizonAngle, range;
-        size_t rowIdn, columnIdn, index, cloudSize; 
-        PointType thisPoint;
-
-        cloudSize = laserCloudIn->points.size();
+        size_t cloudSize = laserCloudIn->points.size();
 
         for (size_t i = 0; i < cloudSize; ++i){
 
-            thisPoint.x = laserCloudIn->points[i].x;
-            thisPoint.y = laserCloudIn->points[i].y;
-            thisPoint.z = laserCloudIn->points[i].z;
+            const auto& thisPoint = laserCloudIn->points[i];
+
             // find the row and column index in the iamge for this point
-            verticalAngle = atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y)) * 180 / M_PI;
-            rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
-            if (rowIdn < 0 || rowIdn >= N_SCAN)
-                continue;
+            float verticalAngle = atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y));
+            size_t rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
+            if (rowIdn >= N_SCAN){
+              continue;
+            }
 
-            horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
+            float horizonAngle = atan2(thisPoint.x, thisPoint.y);
 
-            columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
-            if (columnIdn >= Horizon_SCAN)
-                columnIdn -= Horizon_SCAN;
+            size_t columnIdn = -round((horizonAngle-M_PI_2)/ang_res_x) + Horizon_SCAN/2;
+            if (columnIdn >= Horizon_SCAN){
+              columnIdn -= Horizon_SCAN;
+            }
 
-            if (columnIdn < 0 || columnIdn >= Horizon_SCAN)
-                continue;
+            if (columnIdn < 0 || columnIdn >= Horizon_SCAN){
+              continue;
+            }
 
-            range = sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y + thisPoint.z * thisPoint.z);
-            if (range < 0.1)
-                continue;
+            float range = sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y + thisPoint.z * thisPoint.z);
+            if (range < 0.1){
+              continue;
+            }
             
             rangeMat(rowIdn, columnIdn) = range;
 
-            thisPoint.intensity = (float)rowIdn + (float)columnIdn / 10000.0;
-
-            index = columnIdn  + rowIdn * Horizon_SCAN;
+            size_t index = columnIdn  + rowIdn * Horizon_SCAN;
             fullCloud->points[index] = thisPoint;
+            fullCloud->points[index].intensity = (float)rowIdn + (float)columnIdn * 0.0001f;
+
             fullInfoCloud->points[index].intensity = range; // the corresponding range of a point is saved as "intensity"
         }
     }
 
 
     void groundRemoval(){
-        size_t lowerInd, upperInd;
-        float diffX, diffY, diffZ, angle;
         // groundMat
         // -1, no valid info to check if ground of not
         //  0, initial value, after validation, means not ground
         //  1, ground
+        const float LIMIT = 10.0 * (M_PI/180.0);
+
         for (size_t j = 0; j < Horizon_SCAN; ++j){
             for (size_t i = 0; i < groundScanInd; ++i){
 
-                lowerInd = j + ( i )*Horizon_SCAN;
-                upperInd = j + (i+1)*Horizon_SCAN;
+                size_t lowerInd = j + ( i )*Horizon_SCAN;
+                size_t upperInd = lowerInd + Horizon_SCAN;
 
                 if (fullCloud->points[lowerInd].intensity == -1 ||
                     fullCloud->points[upperInd].intensity == -1){
@@ -260,13 +259,13 @@ public:
                     continue;
                 }
                     
-                diffX = fullCloud->points[upperInd].x - fullCloud->points[lowerInd].x;
-                diffY = fullCloud->points[upperInd].y - fullCloud->points[lowerInd].y;
-                diffZ = fullCloud->points[upperInd].z - fullCloud->points[lowerInd].z;
+                float diffX = fullCloud->points[upperInd].x - fullCloud->points[lowerInd].x;
+                float diffY = fullCloud->points[upperInd].y - fullCloud->points[lowerInd].y;
+                float diffZ = fullCloud->points[upperInd].z - fullCloud->points[lowerInd].z;
 
-                angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) ) * 180 / M_PI;
+                float angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) );
 
-                if (abs(angle - sensorMountAngle) <= 10){
+                if (abs(angle - sensorMountAngle) <= LIMIT){
                     groundMat(i,j) = 1;
                     groundMat(i+1,j) = 1;
                 }
@@ -294,23 +293,28 @@ public:
 
     void cloudSegmentation(){
         // segmentation process
-        for (size_t i = 0; i < N_SCAN; ++i)
-            for (size_t j = 0; j < Horizon_SCAN; ++j)
-                if (labelMat(i,j) == 0)
-                    labelComponents(i, j);
+        for (size_t i = 0; i < N_SCAN; ++i){
+          for (size_t j = 0; j < Horizon_SCAN; ++j){
+            if (labelMat(i,j) == 0){
+              labelComponents(i, j);
+            }
+          }
+        }
 
         int sizeOfSegCloud = 0;
         // extract segmented cloud for lidar odometry
         for (size_t i = 0; i < N_SCAN; ++i) {
 
+            const size_t horiz_scan_offset = i*Horizon_SCAN;
             segMsg.startRingIndex[i] = sizeOfSegCloud-1 + 5;
 
             for (size_t j = 0; j < Horizon_SCAN; ++j) {
+                const auto& full_cloud_point = fullCloud->points[j + horiz_scan_offset];
                 if (labelMat(i,j) > 0 || groundMat(i,j) == 1){
                     // outliers that will not be used for optimization (always continue)
                     if (labelMat(i,j) == 999999){
                         if (i > groundScanInd && j % 5 == 0){
-                            outlierCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+                            outlierCloud->push_back(full_cloud_point);
                             continue;
                         }else{
                             continue;
@@ -328,7 +332,7 @@ public:
                     // save range info
                     segMsg.segmentedCloudRange[sizeOfSegCloud]  = rangeMat(i,j);
                     // save seg cloud
-                    segmentedCloud->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+                    segmentedCloud->push_back(full_cloud_point);
                     // size of seg cloud
                     ++sizeOfSegCloud;
                 }
@@ -340,9 +344,10 @@ public:
         // extract segmented cloud for visualization
         if (pubSegmentedCloudPure.getNumSubscribers() != 0){
             for (size_t i = 0; i < N_SCAN; ++i){
+                const size_t horiz_scan_offset = i*Horizon_SCAN;
                 for (size_t j = 0; j < Horizon_SCAN; ++j){
                     if (labelMat(i,j) > 0 && labelMat(i,j) != 999999){
-                        segmentedCloudPure->push_back(fullCloud->points[j + i*Horizon_SCAN]);
+                        segmentedCloudPure->push_back(fullCloud->points[j + horiz_scan_offset]);
                         segmentedCloudPure->points.back().intensity = labelMat(i,j);
                     }
                 }
