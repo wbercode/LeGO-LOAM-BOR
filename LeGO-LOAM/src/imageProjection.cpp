@@ -27,6 +27,7 @@
 // POSSIBILITY OF SUCH DAMAGE.
 
 #include "utility.h"
+#include "fasttrigo.h"
 #include <Eigen/Eigenvalues>
 #include <Eigen/QR>
 
@@ -203,18 +204,22 @@ public:
 
         for (size_t i = 0; i < cloudSize; ++i){
 
-            const auto& thisPoint = laserCloudIn->points[i];
+            auto thisPoint = laserCloudIn->points[i];
+            float x_sqr = thisPoint.x * thisPoint.x ;
+            float y_sqr = thisPoint.y * thisPoint.y ;
+            float z_sqr = thisPoint.z * thisPoint.z ;
 
             // find the row and column index in the iamge for this point
-            float verticalAngle = atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y));
-            size_t rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
-            if (rowIdn >= N_SCAN){
+            float verticalAngle = FTA::atan2(thisPoint.z, FTA::sqrt(x_sqr + y_sqr));
+            int rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
+            if (rowIdn < 0 || rowIdn >= N_SCAN){
               continue;
             }
 
-            float horizonAngle = atan2(thisPoint.x, thisPoint.y);
+            float horizonAngle = FTA::atan2(thisPoint.x, thisPoint.y);
 
-            size_t columnIdn = -round((horizonAngle-M_PI_2)/ang_res_x) + Horizon_SCAN/2;
+            int  columnIdn = -std::round((horizonAngle-M_PI_2)/ang_res_x) + Horizon_SCAN/2;
+
             if (columnIdn >= Horizon_SCAN){
               columnIdn -= Horizon_SCAN;
             }
@@ -223,17 +228,17 @@ public:
               continue;
             }
 
-            float range = sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y + thisPoint.z * thisPoint.z);
+            float range = FTA::sqrt(x_sqr + y_sqr + z_sqr);
             if (range < 0.1){
               continue;
             }
             
             rangeMat(rowIdn, columnIdn) = range;
 
+            thisPoint.intensity = (float)rowIdn + (float)columnIdn * 0.0001f;
+
             size_t index = columnIdn  + rowIdn * Horizon_SCAN;
             fullCloud->points[index] = thisPoint;
-            fullCloud->points[index].intensity = (float)rowIdn + (float)columnIdn * 0.0001f;
-
             fullInfoCloud->points[index].intensity = range; // the corresponding range of a point is saved as "intensity"
         }
     }
@@ -263,7 +268,7 @@ public:
                 float diffY = fullCloud->points[upperInd].y - fullCloud->points[lowerInd].y;
                 float diffZ = fullCloud->points[upperInd].z - fullCloud->points[lowerInd].z;
 
-                float angle = atan2(diffZ, sqrt(diffX*diffX + diffY*diffY) );
+                float angle = FTA::atan2(diffZ, FTA::sqrt(diffX*diffX + diffY*diffY) );
 
                 if (abs(angle - sensorMountAngle) <= LIMIT){
                     groundMat(i,j) = 1;
@@ -406,7 +411,7 @@ public:
                 else
                     alpha = segmentAlphaY;
 
-                angle = atan2(d2*sin(alpha), (d1 -d2*cos(alpha)));
+                angle = FTA::atan2(d2*FTA::sin(alpha), (d1 -d2*FTA::cos(alpha)));
 
                 if (angle > segmentTheta){
 

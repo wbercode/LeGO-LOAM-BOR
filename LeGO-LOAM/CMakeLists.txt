@@ -42,7 +42,7 @@ link_directories(
 	${GTSAM_LIBRARY_DIRS}
 )
 
-add_executable(imageProjection src/imageProjection.cpp)
+add_executable(imageProjection src/imageProjection.cpp src/fasttrigo.cpp)
 add_dependencies(imageProjection ${catkin_EXPORTED_TARGETS} cloud_msgs_gencpp)
 target_link_libraries(imageProjection ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
