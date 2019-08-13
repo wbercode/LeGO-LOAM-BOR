@@ -130,6 +130,7 @@ void ImageProjection::cloudHandler(
   publishClouds();
 }
 
+
 void ImageProjection::projectPointCloud() {
   // range image projection
   const size_t cloudSize = _laser_cloud_in->points.size();
@@ -137,24 +138,34 @@ void ImageProjection::projectPointCloud() {
   for (size_t i = 0; i < cloudSize; ++i) {
     PointType thisPoint = _laser_cloud_in->points[i];
 
-    // find the row and column index in the iamge for this point
-    float verticalAngle = atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x +
-                                                  thisPoint.y * thisPoint.y)) *
-                          180 / M_PI;
-    int rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
-    if (rowIdn < 0 || rowIdn >= _N_scan) continue;
-
-    float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
-
-    int columnIdn =
-        -round((horizonAngle - 90.0) / ang_res_x) + _horizon_scan / 2;
-    if (columnIdn >= _horizon_scan) columnIdn -= _horizon_scan;
-
-    if (columnIdn < 0 || columnIdn >= _horizon_scan) continue;
-
-    float range = sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y +
+    float range = sqrt(thisPoint.x * thisPoint.x +
+                       thisPoint.y * thisPoint.y +
                        thisPoint.z * thisPoint.z);
-    if (range < 0.1) continue;
+
+    // find the row and column index in the image for this point
+    float verticalAngle = std::asin(thisPoint.z / range);
+        //std::atan2(thisPoint.z, sqrt(thisPoint.x * thisPoint.x + thisPoint.y * thisPoint.y));
+
+    int rowIdn = (verticalAngle + ang_bottom) / ang_res_y;
+    if (rowIdn < 0 || rowIdn >= _N_scan) {
+      continue;
+    }
+
+    float horizonAngle = std::atan2(thisPoint.x, thisPoint.y);
+
+    int columnIdn = -round((horizonAngle - M_PI_2) / ang_res_x) + _horizon_scan * 0.5;
+
+    if (columnIdn >= _horizon_scan){
+      columnIdn -= _horizon_scan;
+    }
+
+    if (columnIdn < 0 || columnIdn >= _horizon_scan){
+      continue;
+    }
+
+    if (range < 0.1){
+      continue;
+    }
 
     _range_mat(rowIdn, columnIdn) = range;
 
@@ -171,10 +182,10 @@ void ImageProjection::projectPointCloud() {
 void ImageProjection::findStartEndAngle() {
   // start and end orientation of this cloud
   auto point = _laser_cloud_in->points.front();
-  _seg_msg.startOrientation = -atan2(point.y, point.x);
+  _seg_msg.startOrientation = -std::atan2(point.y, point.x);
 
   point = _laser_cloud_in->points.back();
-  _seg_msg.endOrientation = -atan2(point.y, point.x) + 2 * M_PI;
+  _seg_msg.endOrientation = -std::atan2(point.y, point.x) + 2 * M_PI;
 
   if (_seg_msg.endOrientation - _seg_msg.startOrientation > 3 * M_PI) {
     _seg_msg.endOrientation -= 2 * M_PI;
@@ -202,17 +213,18 @@ void ImageProjection::groundRemoval() {
         continue;
       }
 
-      float diffX =
+      float dX =
           _full_cloud->points[upperInd].x - _full_cloud->points[lowerInd].x;
-      float diffY =
+      float dY =
           _full_cloud->points[upperInd].y - _full_cloud->points[lowerInd].y;
-      float diffZ =
+      float dZ =
           _full_cloud->points[upperInd].z - _full_cloud->points[lowerInd].z;
 
-      float angle =
-          atan2(diffZ, sqrt(diffX * diffX + diffY * diffY)) * 180 / M_PI;
+      float vertical_angle = std::atan2(dZ , sqrt(dX * dX + dY * dY + dZ * dZ));
 
-      if (abs(angle - sensorMountAngle) <= 10) {
+      // TODO: review this change
+
+      if ( (vertical_angle - sensorMountAngle) <= 10 * DEG_TO_RAD) {
         _ground_mat(i, j) = 1;
         _ground_mat(i + 1, j) = 1;
       }
@@ -300,7 +312,8 @@ void ImageProjection::cloudSegmentation() {
 
 void ImageProjection::labelComponents(int row, int col) {
   // use std::queue std::vector std::deque will slow the program down greatly
-  float d1, d2, alpha, angle;
+
+  const float segmentThetaThreshold = tan(segmentTheta);
   std::vector<bool> lineCountFlag(_N_scan, false);
 
   _queue_X[0] = row;
@@ -338,19 +351,16 @@ void ImageProjection::labelComponents(int row, int col) {
       // prevent infinite loop (caused by put already examined point back)
       if (_label_mat(thisIndX, thisIndY) != 0) continue;
 
-      d1 = std::max(_range_mat(fromIndX, fromIndY),
+      float d1 = std::max(_range_mat(fromIndX, fromIndY),
                     _range_mat(thisIndX, thisIndY));
-      d2 = std::min(_range_mat(fromIndX, fromIndY),
+      float d2 = std::min(_range_mat(fromIndX, fromIndY),
                     _range_mat(thisIndX, thisIndY));
 
-      if (iter.first == 0)
-        alpha = segmentAlphaX;
-      else
-        alpha = segmentAlphaY;
+      float alpha = (iter.first == 0) ? segmentAlphaX : segmentAlphaY;
 
-      angle = atan2(d2 * sin(alpha), (d1 - d2 * cos(alpha)));
+      float tang = (d2 * sin(alpha) / (d1 - d2 * cos(alpha)));
 
-      if (angle > segmentTheta) {
+      if (tang > segmentThetaThreshold) {
         _queue_X[queueEndInd] = thisIndX;
         _queue_Y[queueEndInd] = thisIndY;
         ++queueSize;

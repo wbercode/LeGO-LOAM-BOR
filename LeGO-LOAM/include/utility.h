@@ -51,12 +51,14 @@ typedef Eigen::Vector3f Vector3;
 static const std::string pointCloudTopic = "/velodyne_points";
 static const std::string imuTopic = "/imu/data";
 
+const double DEG_TO_RAD = M_PI / 180.0;
+
 // VLP-16
 static const int N_SCAN = 16;
 static const int HORIZONTAL_SCAN = 1800;
-static const float ang_res_x = 0.2;
-static const float ang_res_y = 2.0;
-static const float ang_bottom = 15.0+0.1;
+static const float ang_res_x = (0.2) * DEG_TO_RAD;
+static const float ang_res_y = (2.0) * DEG_TO_RAD;
+static const float ang_bottom = (15.0+0.1) * DEG_TO_RAD;
 static const int groundScanInd = 7;
 
 // HDL-32E
@@ -94,11 +96,11 @@ static const int systemDelay = 0;
 static const int imuQueLength = 200;
 
 static const float sensorMountAngle = 0.0;
-static const float segmentTheta = 60.0/180.0*M_PI; // decrese this value may improve accuracy
+static const float segmentTheta = 60.0*DEG_TO_RAD; // decrese this value may improve accuracy
 static const int segmentValidPointNum = 5;
 static const int segmentValidLineNum = 3;
-static const float segmentAlphaX = ang_res_x / 180.0 * M_PI;
-static const float segmentAlphaY = ang_res_y / 180.0 * M_PI;
+static const float segmentAlphaX = ang_res_x;
+static const float segmentAlphaY = ang_res_y;
 
 
 static const int edgeFeatureNum = 2;
