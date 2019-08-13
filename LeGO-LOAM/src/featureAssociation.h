@@ -3,6 +3,7 @@
 
 #include "utility.h"
 #include "channel.h"
+#include "nanoflann_pcl.h"
 
 class FeatureAssociation {
 
@@ -128,8 +129,8 @@ class FeatureAssociation {
   pcl::PointCloud<PointType>::Ptr laserCloudOri;
   pcl::PointCloud<PointType>::Ptr coeffSel;
 
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerLast;
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfLast;
+  nanoflann::KdTreeFLANN<PointType> kdtreeCornerLast;
+  nanoflann::KdTreeFLANN<PointType> kdtreeSurfLast;
 
   std::vector<int> pointSearchInd;
   std::vector<float> pointSearchSqDis;

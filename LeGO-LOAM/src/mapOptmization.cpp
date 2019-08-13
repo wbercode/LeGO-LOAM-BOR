@@ -102,9 +102,6 @@ void MapOptimization::allocateMemory() {
   cloudKeyPoses3D.reset(new pcl::PointCloud<PointType>());
   cloudKeyPoses6D.reset(new pcl::PointCloud<PointTypePose>());
 
-  kdtreeSurroundingKeyPoses.reset(new pcl::KdTreeFLANN<PointType>());
-  kdtreeHistoryKeyPoses.reset(new pcl::KdTreeFLANN<PointType>());
-
   surroundingKeyPoses.reset(new pcl::PointCloud<PointType>());
   surroundingKeyPosesDS.reset(new pcl::PointCloud<PointType>());
 
@@ -141,9 +138,6 @@ void MapOptimization::allocateMemory() {
   laserCloudCornerFromMapDS.reset(new pcl::PointCloud<PointType>());
   laserCloudSurfFromMapDS.reset(new pcl::PointCloud<PointType>());
 
-  kdtreeCornerFromMap.reset(new pcl::KdTreeFLANN<PointType>());
-  kdtreeSurfFromMap.reset(new pcl::KdTreeFLANN<PointType>());
-
   nearHistoryCornerKeyFrameCloud.reset(new pcl::PointCloud<PointType>());
   nearHistoryCornerKeyFrameCloudDS.reset(new pcl::PointCloud<PointType>());
   nearHistorySurfKeyFrameCloud.reset(new pcl::PointCloud<PointType>());
@@ -153,7 +147,6 @@ void MapOptimization::allocateMemory() {
   latestSurfKeyFrameCloud.reset(new pcl::PointCloud<PointType>());
   latestSurfKeyFrameCloudDS.reset(new pcl::PointCloud<PointType>());
 
-  kdtreeGlobalMap.reset(new pcl::KdTreeFLANN<PointType>());
   globalMapKeyPoses.reset(new pcl::PointCloud<PointType>());
   globalMapKeyPosesDS.reset(new pcl::PointCloud<PointType>());
   globalMapKeyFrames.reset(new pcl::PointCloud<PointType>());
@@ -566,10 +559,10 @@ void MapOptimization::publishGlobalMap() {
   std::vector<float> pointSearchSqDisGlobalMap;
   // search near key frames to visualize
   mtx.lock();
-  kdtreeGlobalMap->setInputCloud(cloudKeyPoses3D);
-  kdtreeGlobalMap->radiusSearch(
+  kdtreeGlobalMap.setInputCloud(cloudKeyPoses3D);
+  kdtreeGlobalMap.radiusSearch(
       currentRobotPosPoint, globalMapVisualizationSearchRadius,
-      pointSearchIndGlobalMap, pointSearchSqDisGlobalMap, 0);
+      pointSearchIndGlobalMap, pointSearchSqDisGlobalMap);
   mtx.unlock();
 
   for (int i = 0; i < pointSearchIndGlobalMap.size(); ++i)
@@ -614,10 +607,10 @@ bool MapOptimization::detectLoopClosure() {
   // find the closest history key frame
   std::vector<int> pointSearchIndLoop;
   std::vector<float> pointSearchSqDisLoop;
-  kdtreeHistoryKeyPoses->setInputCloud(cloudKeyPoses3D);
-  kdtreeHistoryKeyPoses->radiusSearch(
+  kdtreeHistoryKeyPoses.setInputCloud(cloudKeyPoses3D);
+  kdtreeHistoryKeyPoses.radiusSearch(
       currentRobotPosPoint, historyKeyframeSearchRadius, pointSearchIndLoop,
-      pointSearchSqDisLoop, 0);
+      pointSearchSqDisLoop);
 
   closestHistoryFrameID = -1;
   for (int i = 0; i < pointSearchIndLoop.size(); ++i) {
@@ -820,10 +813,10 @@ void MapOptimization::extractSurroundingKeyFrames() {
     surroundingKeyPoses->clear();
     surroundingKeyPosesDS->clear();
     // extract all the nearby key poses and downsample them
-    kdtreeSurroundingKeyPoses->setInputCloud(cloudKeyPoses3D);
-    kdtreeSurroundingKeyPoses->radiusSearch(
+    kdtreeSurroundingKeyPoses.setInputCloud(cloudKeyPoses3D);
+    kdtreeSurroundingKeyPoses.radiusSearch(
         currentRobotPosPoint, (double)surroundingKeyframeSearchRadius,
-        pointSearchInd, pointSearchSqDis, 0);
+        pointSearchInd, pointSearchSqDis);
     for (int i = 0; i < pointSearchInd.size(); ++i)
       surroundingKeyPoses->points.push_back(
           cloudKeyPoses3D->points[pointSearchInd[i]]);
@@ -924,7 +917,7 @@ void MapOptimization::cornerOptimization(int iterCount) {
   for (int i = 0; i < laserCloudCornerLastDSNum; i++) {
     pointOri = laserCloudCornerLastDS->points[i];
     pointAssociateToMap(&pointOri, &pointSel);
-    kdtreeCornerFromMap->nearestKSearch(pointSel, 5, pointSearchInd,
+    kdtreeCornerFromMap.nearestKSearch(pointSel, 5, pointSearchInd,
                                         pointSearchSqDis);
 
     if (pointSearchSqDis[4] < 1.0) {
@@ -1029,7 +1022,7 @@ void MapOptimization::surfOptimization(int iterCount) {
   for (int i = 0; i < laserCloudSurfTotalLastDSNum; i++) {
     pointOri = laserCloudSurfTotalLastDS->points[i];
     pointAssociateToMap(&pointOri, &pointSel);
-    kdtreeSurfFromMap->nearestKSearch(pointSel, 5, pointSearchInd,
+    kdtreeSurfFromMap.nearestKSearch(pointSel, 5, pointSearchInd,
                                       pointSearchSqDis);
 
     if (pointSearchSqDis[4] < 1.0) {
@@ -1200,8 +1193,8 @@ bool MapOptimization::LMOptimization(int iterCount) {
 
 void MapOptimization::scan2MapOptimization() {
   if (laserCloudCornerFromMapDSNum > 10 && laserCloudSurfFromMapDSNum > 100) {
-    kdtreeCornerFromMap->setInputCloud(laserCloudCornerFromMapDS);
-    kdtreeSurfFromMap->setInputCloud(laserCloudSurfFromMapDS);
+    kdtreeCornerFromMap.setInputCloud(laserCloudCornerFromMapDS);
+    kdtreeSurfFromMap.setInputCloud(laserCloudSurfFromMapDS);
 
     for (int iterCount = 0; iterCount < 10; iterCount++) {
       laserCloudOri->clear();

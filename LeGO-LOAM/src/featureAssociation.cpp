@@ -174,9 +174,6 @@ void FeatureAssociation::initializationValue() {
   laserCloudOri.reset(new pcl::PointCloud<PointType>());
   coeffSel.reset(new pcl::PointCloud<PointType>());
 
-  kdtreeCornerLast.reset(new pcl::KdTreeFLANN<PointType>());
-  kdtreeSurfLast.reset(new pcl::KdTreeFLANN<PointType>());
-
   laserOdometry.header.frame_id = "/camera_init";
   laserOdometry.child_frame_id = "/laser_odom";
 
@@ -849,7 +846,7 @@ void FeatureAssociation::findCorrespondingCornerFeatures(int iterCount) {
     TransformToStart(&cornerPointsSharp->points[i], &pointSel);
 
     if (iterCount % 5 == 0) {
-      kdtreeCornerLast->nearestKSearch(pointSel, 1, pointSearchInd,
+      kdtreeCornerLast.nearestKSearch(pointSel, 1, pointSearchInd,
                                        pointSearchSqDis);
       int closestPointInd = -1, minPointInd2 = -1;
 
@@ -967,7 +964,7 @@ void FeatureAssociation::findCorrespondingSurfFeatures(int iterCount) {
     TransformToStart(&surfPointsFlat->points[i], &pointSel);
 
     if (iterCount % 5 == 0) {
-      kdtreeSurfLast->nearestKSearch(pointSel, 1, pointSearchInd,
+      kdtreeSurfLast.nearestKSearch(pointSel, 1, pointSearchInd,
                                      pointSearchSqDis);
       int closestPointInd = -1, minPointInd2 = -1, minPointInd3 = -1;
 
@@ -1458,8 +1455,8 @@ void FeatureAssociation::checkSystemInitialization() {
   surfPointsLessFlat = laserCloudSurfLast;
   laserCloudSurfLast = laserCloudTemp;
 
-  kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
-  kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
+  kdtreeCornerLast.setInputCloud(laserCloudCornerLast);
+  kdtreeSurfLast.setInputCloud(laserCloudSurfLast);
 
   laserCloudCornerLastNum = laserCloudCornerLast->points.size();
   laserCloudSurfLastNum = laserCloudSurfLast->points.size();
@@ -1640,8 +1637,8 @@ void FeatureAssociation::publishCloudsLast() {
   laserCloudSurfLastNum = laserCloudSurfLast->points.size();
 
   if (laserCloudCornerLastNum > 10 && laserCloudSurfLastNum > 100) {
-    kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
-    kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
+    kdtreeCornerLast.setInputCloud(laserCloudCornerLast);
+    kdtreeSurfLast.setInputCloud(laserCloudSurfLast);
   }
 
   frameCount++;

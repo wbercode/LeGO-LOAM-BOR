@@ -3,6 +3,7 @@
 
 #include "utility.h"
 #include "channel.h"
+#include "nanoflann_pcl.h"
 
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>
@@ -130,11 +131,11 @@ class MapOptimization {
   pcl::PointCloud<PointType>::Ptr laserCloudCornerFromMapDS;
   pcl::PointCloud<PointType>::Ptr laserCloudSurfFromMapDS;
 
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeCornerFromMap;
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurfFromMap;
+  nanoflann::KdTreeFLANN<PointType> kdtreeCornerFromMap;
+  nanoflann::KdTreeFLANN<PointType> kdtreeSurfFromMap;
 
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeSurroundingKeyPoses;
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeHistoryKeyPoses;
+  nanoflann::KdTreeFLANN<PointType> kdtreeSurroundingKeyPoses;
+  nanoflann::KdTreeFLANN<PointType> kdtreeHistoryKeyPoses;
 
   pcl::PointCloud<PointType>::Ptr nearHistoryCornerKeyFrameCloud;
   pcl::PointCloud<PointType>::Ptr nearHistoryCornerKeyFrameCloudDS;
@@ -145,7 +146,7 @@ class MapOptimization {
   pcl::PointCloud<PointType>::Ptr latestSurfKeyFrameCloud;
   pcl::PointCloud<PointType>::Ptr latestSurfKeyFrameCloudDS;
 
-  pcl::KdTreeFLANN<PointType>::Ptr kdtreeGlobalMap;
+  nanoflann::KdTreeFLANN<PointType> kdtreeGlobalMap;
   pcl::PointCloud<PointType>::Ptr globalMapKeyPoses;
   pcl::PointCloud<PointType>::Ptr globalMapKeyPosesDS;
   pcl::PointCloud<PointType>::Ptr globalMapKeyFrames;
