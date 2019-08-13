@@ -4,6 +4,8 @@
 #include "utility.h"
 #include "channel.h"
 #include "nanoflann_pcl.h"
+#include <Eigen/Eigenvalues>
+#include <Eigen/QR>
 
 class FeatureAssociation {
 
@@ -141,7 +143,6 @@ class FeatureAssociation {
   tf::StampedTransform laserOdometryTrans;
 
   bool isDegenerate;
-  cv::Mat matP;
 
   int frameCount;
   size_t cycle_count;

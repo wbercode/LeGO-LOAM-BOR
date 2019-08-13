@@ -3,6 +3,8 @@
 
 #include "utility.h"
 #include "channel.h"
+#include <Eigen/Eigenvalues>
+#include <Eigen/QR>
 
 class ImageProjection {
  public:
@@ -55,9 +57,9 @@ class ImageProjection {
 
   int _label_count;
 
-  cv::Mat _range_mat;   // range matrix for range image
-  cv::Mat _label_mat;   // label matrix for segmentaiton marking
-  cv::Mat _ground_mat;  // ground matrix for ground cloud marking
+  Eigen::MatrixXf _range_mat;   // range matrix for range image
+  Eigen::MatrixXi _label_mat;   // label matrix for segmentaiton marking
+  Eigen::Matrix<int8_t,Eigen::Dynamic,Eigen::Dynamic> _ground_mat;  // ground matrix for ground cloud marking
 
   std::vector<uint16_t> _all_pushed_X;  // array for tracking points of a segmented object
   std::vector<uint16_t> _all_pushed_Y;

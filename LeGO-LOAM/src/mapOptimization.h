@@ -191,16 +191,17 @@ class MapOptimization {
 
   PointType pointOri, pointSel, pointProj, coeff;
 
-  cv::Mat matA0;
-  cv::Mat matB0;
-  cv::Mat matX0;
+  Eigen::Matrix<float, 5, 3> matA0;
+  Eigen::Matrix<float, 5, 1> matB0;
+  Eigen::Vector3f matX0;
 
-  cv::Mat matA1;
-  cv::Mat matD1;
-  cv::Mat matV1;
+  Eigen::Matrix3f matA1;
+  Eigen::Matrix<float, 1, 3> matD1;
+  Eigen::Matrix3f matV1;
+
+  Eigen::Matrix<float, 6, 6> matP;
 
   bool isDegenerate;
-  cv::Mat matP;
 
   int laserCloudCornerFromMapDSNum;
   int laserCloudSurfFromMapDSNum;

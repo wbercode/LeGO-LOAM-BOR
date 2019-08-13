@@ -86,10 +86,14 @@ void ImageProjection::resetParameters() {
   _segmented_cloud_pure->clear();
   _outlier_cloud->clear();
 
-  _range_mat =
-      cv::Mat(_N_scan, _horizon_scan, CV_32F, cv::Scalar::all(FLT_MAX));
-  _ground_mat = cv::Mat(_N_scan, _horizon_scan, CV_8S, cv::Scalar::all(0));
-  _label_mat = cv::Mat(_N_scan, _horizon_scan, CV_32S, cv::Scalar::all(0));
+  _range_mat.resize(_N_scan, _horizon_scan);
+  _ground_mat.resize(_N_scan, _horizon_scan);
+  _label_mat.resize(_N_scan, _horizon_scan);
+
+  _range_mat.fill(FLT_MAX);
+  _ground_mat.setZero();
+  _label_mat.setZero();
+
   _label_count = 1;
 
   std::fill(_full_cloud->points.begin(), _full_cloud->points.end(), nanPoint);
@@ -152,7 +156,7 @@ void ImageProjection::projectPointCloud() {
                        thisPoint.z * thisPoint.z);
     if (range < 0.1) continue;
 
-    _range_mat.at<float>(rowIdn, columnIdn) = range;
+    _range_mat(rowIdn, columnIdn) = range;
 
     thisPoint.intensity = (float)rowIdn + (float)columnIdn / 10000.0;
 
@@ -194,7 +198,7 @@ void ImageProjection::groundRemoval() {
       if (_full_cloud->points[lowerInd].intensity == -1 ||
           _full_cloud->points[upperInd].intensity == -1) {
         // no info to check, invalid points
-        _ground_mat.at<int8_t>(i, j) = -1;
+        _ground_mat(i, j) = -1;
         continue;
       }
 
@@ -209,8 +213,8 @@ void ImageProjection::groundRemoval() {
           atan2(diffZ, sqrt(diffX * diffX + diffY * diffY)) * 180 / M_PI;
 
       if (abs(angle - sensorMountAngle) <= 10) {
-        _ground_mat.at<int8_t>(i, j) = 1;
-        _ground_mat.at<int8_t>(i + 1, j) = 1;
+        _ground_mat(i, j) = 1;
+        _ground_mat(i + 1, j) = 1;
       }
     }
   }
@@ -220,16 +224,16 @@ void ImageProjection::groundRemoval() {
   // for mark label matrix for the 16th scan
   for (size_t i = 0; i < _N_scan; ++i) {
     for (size_t j = 0; j < _horizon_scan; ++j) {
-      if (_ground_mat.at<int8_t>(i, j) == 1 ||
-          _range_mat.at<float>(i, j) == FLT_MAX) {
-        _label_mat.at<int>(i, j) = -1;
+      if (_ground_mat(i, j) == 1 ||
+          _range_mat(i, j) == FLT_MAX) {
+        _label_mat(i, j) = -1;
       }
     }
   }
 
   for (size_t i = 0; i <= groundScanInd; ++i) {
     for (size_t j = 0; j < _horizon_scan; ++j) {
-      if (_ground_mat.at<int8_t>(i, j) == 1)
+      if (_ground_mat(i, j) == 1)
         _ground_cloud->push_back(_full_cloud->points[j + i * _horizon_scan]);
     }
   }
@@ -239,7 +243,7 @@ void ImageProjection::cloudSegmentation() {
   // segmentation process
   for (size_t i = 0; i < _N_scan; ++i)
     for (size_t j = 0; j < _horizon_scan; ++j)
-      if (_label_mat.at<int>(i, j) == 0) labelComponents(i, j);
+      if (_label_mat(i, j) == 0) labelComponents(i, j);
 
   int sizeOfSegCloud = 0;
   // extract segmented cloud for lidar odometry
@@ -247,9 +251,9 @@ void ImageProjection::cloudSegmentation() {
     _seg_msg.startRingIndex[i] = sizeOfSegCloud - 1 + 5;
 
     for (size_t j = 0; j < _horizon_scan; ++j) {
-      if (_label_mat.at<int>(i, j) > 0 || _ground_mat.at<int8_t>(i, j) == 1) {
+      if (_label_mat(i, j) > 0 || _ground_mat(i, j) == 1) {
         // outliers that will not be used for optimization (always continue)
-        if (_label_mat.at<int>(i, j) == 999999) {
+        if (_label_mat(i, j) == 999999) {
           if (i > groundScanInd && j % 5 == 0) {
             _outlier_cloud->push_back(
                 _full_cloud->points[j + i * _horizon_scan]);
@@ -259,18 +263,18 @@ void ImageProjection::cloudSegmentation() {
           }
         }
         // majority of ground points are skipped
-        if (_ground_mat.at<int8_t>(i, j) == 1) {
+        if (_ground_mat(i, j) == 1) {
           if (j % 5 != 0 && j > 5 && j < _horizon_scan - 5) continue;
         }
         // mark ground points so they will not be considered as edge features
         // later
         _seg_msg.segmentedCloudGroundFlag[sizeOfSegCloud] =
-            (_ground_mat.at<int8_t>(i, j) == 1);
+            (_ground_mat(i, j) == 1);
         // mark the points' column index for marking occlusion later
         _seg_msg.segmentedCloudColInd[sizeOfSegCloud] = j;
         // save range info
         _seg_msg.segmentedCloudRange[sizeOfSegCloud] =
-            _range_mat.at<float>(i, j);
+            _range_mat(i, j);
         // save seg cloud
         _segmented_cloud->push_back(_full_cloud->points[j + i * _horizon_scan]);
         // size of seg cloud
@@ -284,11 +288,11 @@ void ImageProjection::cloudSegmentation() {
   // extract segmented cloud for visualization
   for (size_t i = 0; i < _N_scan; ++i) {
     for (size_t j = 0; j < _horizon_scan; ++j) {
-      if (_label_mat.at<int>(i, j) > 0 && _label_mat.at<int>(i, j) != 999999) {
+      if (_label_mat(i, j) > 0 && _label_mat(i, j) != 999999) {
         _segmented_cloud_pure->push_back(
             _full_cloud->points[j + i * _horizon_scan]);
         _segmented_cloud_pure->points.back().intensity =
-            _label_mat.at<int>(i, j);
+            _label_mat(i, j);
       }
     }
   }
@@ -319,7 +323,7 @@ void ImageProjection::labelComponents(int row, int col) {
     --queueSize;
     ++queueStartInd;
     // Mark popped point
-    _label_mat.at<int>(fromIndX, fromIndY) = _label_count;
+    _label_mat(fromIndX, fromIndY) = _label_count;
     // Loop through all the neighboring grids of popped grid
 
     for (const auto& iter : neighborIterator) {
@@ -332,12 +336,12 @@ void ImageProjection::labelComponents(int row, int col) {
       if (thisIndY < 0) thisIndY = _horizon_scan - 1;
       if (thisIndY >= _horizon_scan) thisIndY = 0;
       // prevent infinite loop (caused by put already examined point back)
-      if (_label_mat.at<int>(thisIndX, thisIndY) != 0) continue;
+      if (_label_mat(thisIndX, thisIndY) != 0) continue;
 
-      d1 = std::max(_range_mat.at<float>(fromIndX, fromIndY),
-                    _range_mat.at<float>(thisIndX, thisIndY));
-      d2 = std::min(_range_mat.at<float>(fromIndX, fromIndY),
-                    _range_mat.at<float>(thisIndX, thisIndY));
+      d1 = std::max(_range_mat(fromIndX, fromIndY),
+                    _range_mat(thisIndX, thisIndY));
+      d2 = std::min(_range_mat(fromIndX, fromIndY),
+                    _range_mat(thisIndX, thisIndY));
 
       if (iter.first == 0)
         alpha = segmentAlphaX;
@@ -352,7 +356,7 @@ void ImageProjection::labelComponents(int row, int col) {
         ++queueSize;
         ++queueEndInd;
 
-        _label_mat.at<int>(thisIndX, thisIndY) = _label_count;
+        _label_mat(thisIndX, thisIndY) = _label_count;
         lineCountFlag[thisIndX] = true;
 
         _all_pushed_X[allPushedIndSize] = thisIndX;
@@ -378,7 +382,7 @@ void ImageProjection::labelComponents(int row, int col) {
     ++_label_count;
   } else {  // segment is invalid, mark these points
     for (size_t i = 0; i < allPushedIndSize; ++i) {
-      _label_mat.at<int>(_all_pushed_X[i], _all_pushed_Y[i]) = 999999;
+      _label_mat(_all_pushed_X[i], _all_pushed_Y[i]) = 999999;
     }
   }
 }

@@ -87,7 +87,7 @@ static const int groundScanInd = 7;
 static const float scanPeriod = 0.1;
 
 static const bool loopClosureEnableFlag = false;
-static const size_t mappingFrequencyDivider = 3;
+static const size_t mappingFrequencyDivider = 5;
 static const double mappingProcessInterval = scanPeriod*mappingFrequencyDivider;
 
 static const int systemDelay = 0;

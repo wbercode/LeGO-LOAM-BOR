@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   tf
   roscpp
   rospy
-  cv_bridge
   image_transport
   rosbag_storage
 
@@ -25,7 +24,6 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(GTSAM REQUIRED QUIET)
 find_package(PCL REQUIRED QUIET)
-find_package(OpenCV REQUIRED QUIET)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -37,13 +35,11 @@ include_directories(
 	include
 	${catkin_INCLUDE_DIRS}
 	${PCL_INCLUDE_DIRS}
-	${OpenCV_INCLUDE_DIRS}
 	${GTSAM_INCLUDE_DIR}
 )
 
 link_directories(
 	include
-	${OpenCV_LIBRARY_DIRS}
 	${PCL_LIBRARY_DIRS}
 	${GTSAM_LIBRARY_DIRS}
 )
@@ -56,5 +52,5 @@ add_executable(lego_loam
     src/main.cpp)
 
 add_dependencies(lego_loam ${catkin_EXPORTED_TARGETS} cloud_msgs_gencpp)
-target_link_libraries(lego_loam ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} gtsam)
+target_link_libraries(lego_loam ${catkin_LIBRARIES} ${PCL_LIBRARIES} gtsam)
 
