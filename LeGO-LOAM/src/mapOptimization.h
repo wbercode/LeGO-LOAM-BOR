@@ -42,9 +42,6 @@ class MapOptimization {
   void imuHandler(const sensor_msgs::Imu::ConstPtr &imuIn);
   void run();
 
-  void loopClosureThread();
-  void visualizeGlobalMapThread();
-
  private:
   gtsam::NonlinearFactorGraph gtSAMgraph;
   gtsam::Values initialEstimate;
@@ -60,9 +57,13 @@ class MapOptimization {
   Channel<AssociationOut>& _input_channel;
   std::thread _run_thread;
 
-  Channel<bool> publishGlobalSignal;
-  std::thread publishGlobalThread;
+  Channel<bool> _publish_global_signal;
+  std::thread _publish_global_thread;
   void publishGlobalMapThread();
+
+  Channel<bool> _loop_closure_signal;
+  std::thread _loop_closure_thread;
+  void loopClosureThread();
 
   ros::Publisher pubLaserCloudSurround;
   ros::Publisher pubOdomAftMapped;
