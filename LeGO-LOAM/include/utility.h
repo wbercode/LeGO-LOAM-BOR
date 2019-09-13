@@ -10,8 +10,6 @@
 
 #include "cloud_msgs/cloud_info.h"
 
-#include <opencv/cv.h>
-
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
@@ -90,7 +88,6 @@ static const float scanPeriod = 0.1;
 
 static const bool loopClosureEnableFlag = false;
 static const size_t mappingFrequencyDivider = 5;
-static const double mappingProcessInterval = scanPeriod*mappingFrequencyDivider;
 
 static const int systemDelay = 0;
 static const int imuQueLength = 200;
@@ -103,9 +100,6 @@ static const float segmentAlphaX = ang_res_x;
 static const float segmentAlphaY = ang_res_y;
 
 
-static const int edgeFeatureNum = 2;
-static const int surfFeatureNum = 4;
-static const int sectionsTotal = 6;
 static const float edgeThreshold = 0.1;
 static const float surfThreshold = 0.1;
 static const float nearestFeatureSearchSqDist = 25;
