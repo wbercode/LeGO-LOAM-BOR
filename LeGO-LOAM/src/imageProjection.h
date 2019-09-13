@@ -3,7 +3,6 @@
 
 #include "utility.h"
 #include "channel.h"
-#include <Eigen/Eigenvalues>
 #include <Eigen/QR>
 
 class ImageProjection {

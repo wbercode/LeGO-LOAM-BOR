@@ -966,10 +966,11 @@ void MapOptimization::cornerOptimization(int iterCount) {
       matA1(2, 2) = a33;
 
       Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> esolver(matA1);
+
       matD1 = esolver.eigenvalues().real();
       matV1 = esolver.eigenvectors().real();
 
-      if (matD1(0, 0) > 3 * matD1(0, 1)) {
+      if (matD1[2] > 3 * matD1[1]) {
         float x0 = pointSel.x;
         float y0 = pointSel.y;
         float z0 = pointSel.z;
