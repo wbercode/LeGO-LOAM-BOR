@@ -11,12 +11,12 @@ make the code more readable and efficient
 The purpose of this fork is:
 
 - To improve the quality of the code, making it more readable, consistent and easier to understand and modify.
-- To remove hard-coded values and use proper configuration files to describe the hardware.
+- To remove hard-coded values and use proper configuration files to describe the hardware (WIP)
 - To improve performance, in terms of amount of CPU used to calculate the same result.
 - To convert a multi-process application into a single-process / multi-threading one; this makes the algorithm
   more deterministic and slightly faster.
 - To make it easier and faster to work with rosbags: processing a rosbag should be done at maximum
-  speed allowed by the CPU and in a deterministic way.
+  speed allowed by the CPU and in a deterministic way (usual speed improvement in the order of 5X-10X).
 - As a consequence of the previous point, creating unit and regression tests will be easier.
 
 The purpose of this fork (for the time being) is **not** to modify and/or improve the original algorithm.
