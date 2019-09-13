@@ -26,6 +26,7 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+#include <boost/circular_buffer.hpp>
 #include "imageProjection.h"
 
 ImageProjection::ImageProjection(ros::NodeHandle& nh,
@@ -66,11 +67,6 @@ ImageProjection::ImageProjection(ros::NodeHandle& nh,
   _full_cloud->points.resize(cloud_size);
   _full_info_cloud->points.resize(cloud_size);
 
-  _all_pushed_X.resize(cloud_size);
-  _all_pushed_Y.resize(cloud_size);
-
-  _queue_X.resize(cloud_size);
-  _queue_Y.resize(cloud_size);
 }
 
 void ImageProjection::resetParameters() {
@@ -311,76 +307,75 @@ void ImageProjection::cloudSegmentation() {
 }
 
 void ImageProjection::labelComponents(int row, int col) {
-  // use std::queue std::vector std::deque will slow the program down greatly
 
   const float segmentThetaThreshold = tan(segmentTheta);
+
   std::vector<bool> lineCountFlag(_N_scan, false);
+  const size_t cloud_size = _N_scan * _horizon_scan;
+  using Coord2D = Eigen::Vector2i;
+  boost::circular_buffer<Coord2D> queue(cloud_size);
+  boost::circular_buffer<Coord2D> all_pushed(cloud_size);
 
-  _queue_X[0] = row;
-  _queue_Y[0] = col;
-  int queueSize = 1;
-  int queueStartInd = 0;
-  int queueEndInd = 1;
+  queue.push_back({ row,col } );
+  all_pushed.push_back({ row,col } );
 
-  _all_pushed_X[0] = row;
-  _all_pushed_Y[0] = col;
-  int allPushedIndSize = 1;
-
-  const std::pair<int, int> neighborIterator[4] = {
+  const Coord2D neighborIterator[4] = {
       {0, -1}, {-1, 0}, {1, 0}, {0, 1}};
 
-  while (queueSize > 0) {
+  while (queue.size() > 0) {
     // Pop point
-    int fromIndX = _queue_X[queueStartInd];
-    int fromIndY = _queue_Y[queueStartInd];
-    --queueSize;
-    ++queueStartInd;
+    Coord2D fromInd = queue.front();
+    queue.pop_front();
+
     // Mark popped point
-    _label_mat(fromIndX, fromIndY) = _label_count;
+    _label_mat(fromInd.x(), fromInd.y()) = _label_count;
     // Loop through all the neighboring grids of popped grid
 
     for (const auto& iter : neighborIterator) {
       // new index
-      int thisIndX = fromIndX + iter.first;
-      int thisIndY = fromIndY + iter.second;
+      int thisIndX = fromInd.x() + iter.x();
+      int thisIndY = fromInd.y() + iter.y();
       // index should be within the boundary
-      if (thisIndX < 0 || thisIndX >= _N_scan) continue;
+      if (thisIndX < 0 || thisIndX >= _N_scan){
+        continue;
+      }
       // at range image margin (left or right side)
-      if (thisIndY < 0) thisIndY = _horizon_scan - 1;
-      if (thisIndY >= _horizon_scan) thisIndY = 0;
+      if (thisIndY < 0){
+        thisIndY = _horizon_scan - 1;
+      }
+      if (thisIndY >= _horizon_scan){
+        thisIndY = 0;
+      }
       // prevent infinite loop (caused by put already examined point back)
-      if (_label_mat(thisIndX, thisIndY) != 0) continue;
+      if (_label_mat(thisIndX, thisIndY) != 0){
+        continue;
+      }
 
-      float d1 = std::max(_range_mat(fromIndX, fromIndY),
+      float d1 = std::max(_range_mat(fromInd.x(), fromInd.y()),
                     _range_mat(thisIndX, thisIndY));
-      float d2 = std::min(_range_mat(fromIndX, fromIndY),
+      float d2 = std::min(_range_mat(fromInd.x(), fromInd.y()),
                     _range_mat(thisIndX, thisIndY));
 
-      float alpha = (iter.first == 0) ? segmentAlphaX : segmentAlphaY;
-
+      float alpha = (iter.x() == 0) ? segmentAlphaX : segmentAlphaY;
       float tang = (d2 * sin(alpha) / (d1 - d2 * cos(alpha)));
 
       if (tang > segmentThetaThreshold) {
-        _queue_X[queueEndInd] = thisIndX;
-        _queue_Y[queueEndInd] = thisIndY;
-        ++queueSize;
-        ++queueEndInd;
+        queue.push_back( {thisIndX, thisIndY } );
 
         _label_mat(thisIndX, thisIndY) = _label_count;
         lineCountFlag[thisIndX] = true;
 
-        _all_pushed_X[allPushedIndSize] = thisIndX;
-        _all_pushed_Y[allPushedIndSize] = thisIndY;
-        ++allPushedIndSize;
+        all_pushed.push_back(  {thisIndX, thisIndY } );
       }
     }
   }
 
   // check if this segment is valid
   bool feasibleSegment = false;
-  if (allPushedIndSize >= 30)
+  if (all_pushed.size() >= 30){
     feasibleSegment = true;
-  else if (allPushedIndSize >= segmentValidPointNum) {
+  }
+  else if (all_pushed.size() >= segmentValidPointNum) {
     int lineCount = 0;
     for (size_t i = 0; i < _N_scan; ++i) {
       if (lineCountFlag[i] == true) ++lineCount;
@@ -391,8 +386,8 @@ void ImageProjection::labelComponents(int row, int col) {
   if (feasibleSegment == true) {
     ++_label_count;
   } else {  // segment is invalid, mark these points
-    for (size_t i = 0; i < allPushedIndSize; ++i) {
-      _label_mat(_all_pushed_X[i], _all_pushed_Y[i]) = 999999;
+    for (size_t i = 0; i < all_pushed.size(); ++i) {
+      _label_mat(all_pushed[i].x(), all_pushed[i].y()) = 999999;
     }
   }
 }

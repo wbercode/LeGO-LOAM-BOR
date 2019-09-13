@@ -60,11 +60,6 @@ class ImageProjection {
   Eigen::MatrixXi _label_mat;   // label matrix for segmentaiton marking
   Eigen::Matrix<int8_t,Eigen::Dynamic,Eigen::Dynamic> _ground_mat;  // ground matrix for ground cloud marking
 
-  std::vector<uint16_t> _all_pushed_X;  // array for tracking points of a segmented object
-  std::vector<uint16_t> _all_pushed_Y;
-
-  std::vector<uint16_t> _queue_X;  // array for breadth-first search process of segmentation
-  std::vector<uint16_t> _queue_Y;
 
 };
 
