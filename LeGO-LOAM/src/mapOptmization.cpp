@@ -41,7 +41,11 @@ using namespace gtsam;
 
 MapOptimization::MapOptimization(ros::NodeHandle &node,
                                  Channel<AssociationOut> &input_channel)
-    : nh(node), _input_channel(input_channel), publishGlobalSignal(false) {
+    : nh(node),
+      _input_channel(input_channel),
+      _publish_global_signal(false),
+      _loop_closure_signal(false)
+{
   ISAM2Params parameters;
   parameters.relinearizeThreshold = 0.01;
   parameters.relinearizeSkip = 1;
@@ -84,7 +88,8 @@ MapOptimization::MapOptimization(ros::NodeHandle &node,
 
   allocateMemory();
 
-  publishGlobalThread = std::thread(&MapOptimization::publishGlobalMapThread, this);
+  _publish_global_thread = std::thread(&MapOptimization::publishGlobalMapThread, this);
+  _loop_closure_thread = std::thread(&MapOptimization::loopClosureThread, this);
   _run_thread = std::thread(&MapOptimization::run, this);
 
 }
@@ -94,8 +99,11 @@ MapOptimization::~MapOptimization()
   _input_channel.send({});
   _run_thread.join();
 
-  publishGlobalSignal.send(false);
-  publishGlobalThread.join();
+  _publish_global_signal.send(false);
+  _publish_global_thread.join();
+
+  _loop_closure_signal.send(false);
+  _loop_closure_thread.join();
 }
 
 void MapOptimization::allocateMemory() {
@@ -209,9 +217,21 @@ void MapOptimization::publishGlobalMapThread()
   while(ros::ok())
   {
     bool ready;
-    publishGlobalSignal.receive(ready);
+    _publish_global_signal.receive(ready);
     if(ready){
       publishGlobalMap();
+    }
+  }
+}
+
+void MapOptimization::loopClosureThread()
+{
+  while(ros::ok())
+  {
+    bool ready;
+    _loop_closure_signal.receive(ready);
+    if(ready && loopClosureEnableFlag){
+      performLoopClosure();
     }
   }
 }
@@ -494,10 +514,19 @@ pcl::PointCloud<PointType>::Ptr MapOptimization::transformPointCloud(
 }
 
 void MapOptimization::imuHandler(const sensor_msgs::Imu::ConstPtr &imuIn) {
+
+  if( imuIn->orientation.x == 0 && imuIn->orientation.y == 0 &&
+      imuIn->orientation.z == 0 && imuIn->orientation.w == 0 )
+  {
+    ROS_WARN_THROTTLE(1, "invalid IMU orientation. rejected");
+    return;
+  }
+
   double roll, pitch, yaw;
   tf::Quaternion orientation;
   tf::quaternionMsgToTF(imuIn->orientation, orientation);
   tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
+
   imuPointerLast = (imuPointerLast + 1) % imuQueLength;
   imuTime[imuPointerLast] = imuIn->header.stamp.toSec();
   imuRoll[imuPointerLast] = roll;
@@ -669,7 +698,10 @@ bool MapOptimization::detectLoopClosure() {
 }
 
 void MapOptimization::performLoopClosure() {
-  if (cloudKeyPoses3D->points.empty() == true) return;
+
+  if (cloudKeyPoses3D->points.empty() == true)
+    return;
+
   // try to find close key frame if there are any
   if (potentialLoopFlag == false) {
     if (detectLoopClosure() == true) {
@@ -1422,8 +1454,12 @@ void MapOptimization::run() {
     }
     cycle_count++;
 
+    if ((cycle_count % 3) == 0) {
+      _loop_closure_signal.send(true);
+    }
+
     if ((cycle_count % 10) == 0) {
-      publishGlobalSignal.send(true);
+      _publish_global_signal.send(true);
     }
   }
 }
