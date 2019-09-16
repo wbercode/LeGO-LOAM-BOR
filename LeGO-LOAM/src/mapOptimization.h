@@ -54,6 +54,16 @@ class MapOptimization {
   gtsam::noiseModel::Diagonal::shared_ptr constraintNoise;
 
   ros::NodeHandle& nh;
+  bool _loop_closure_enabled;
+  float _scan_period;
+
+  float _surrounding_keyframe_search_radius;
+  int   _surrounding_keyframe_search_num;
+  float _history_keyframe_search_radius;
+  int   _history_keyframe_search_num;
+  float _history_keyframe_fitness_score;
+  float _global_map_visualization_search_radius;
+
   Channel<AssociationOut>& _input_channel;
   std::thread _run_thread;
 
@@ -181,6 +191,8 @@ class MapOptimization {
 
   int imuPointerFront;
   int imuPointerLast;
+
+  enum { imuQueLength = 200 };
 
   double imuTime[imuQueLength];
   float imuRoll[imuQueLength];

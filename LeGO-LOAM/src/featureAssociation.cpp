@@ -38,17 +38,14 @@
 
 const float RAD2DEG = 180.0 / M_PI;
 
-FeatureAssociation::FeatureAssociation(ros::NodeHandle &node, size_t N_scan,
-                                       size_t horizontal_scan,
+FeatureAssociation::FeatureAssociation(ros::NodeHandle &node,
                                        Channel<ProjectionOut> &input_channel,
                                        Channel<AssociationOut> &output_channel)
     : nh(node),
-      _N_scan(N_scan),
-      _horizontal_scan(horizontal_scan),
       _input_channel(input_channel),
       _output_channel(output_channel) {
   subImu = nh.subscribe<sensor_msgs::Imu>(
-      imuTopic, 50, &FeatureAssociation::imuHandler, this);
+      "/imu/data", 50, &FeatureAssociation::imuHandler, this);
 
   pubCornerPointsSharp =
       nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 1);
@@ -67,10 +64,24 @@ FeatureAssociation::FeatureAssociation(ros::NodeHandle &node, size_t N_scan,
       nh.advertise<sensor_msgs::PointCloud2>("/outlier_cloud_last", 2);
   pubLaserOdometry = nh.advertise<nav_msgs::Odometry>("/laser_odom_to_init", 5);
 
-  cycle_count = 0;
+  _cycle_count = 0;
+
+  nh.getParam("/lego_loam/laser/num_vertical_scans", _vertical_scans);
+  nh.getParam("/lego_loam/laser/num_horizontal_scans", _horizontal_scans);
+  nh.getParam("/lego_loam/laser/scan_period", _scan_period);
+
+  nh.getParam("/lego_loam/featureAssociation/edge_threshold", _edge_threshold);
+  nh.getParam("/lego_loam/featureAssociation/surf_threshold", _surf_threshold);
+
+  nh.getParam("/lego_loam/mapping/mapping_frequency_divider", _mapping_frequency_div);
+
+  float nearest_dist;
+  nh.getParam("/lego_loam/featureAssociation/nearest_feature_search_distance", nearest_dist);
+  _nearest_feature_dist_sqr = nearest_dist*nearest_dist;
+
   initializationValue();
 
-  _run_thread = std::thread (&FeatureAssociation::runFeatureAssociation, this);
+ _run_thread = std::thread (&FeatureAssociation::runFeatureAssociation, this);
 }
 
 FeatureAssociation::~FeatureAssociation()
@@ -80,7 +91,7 @@ FeatureAssociation::~FeatureAssociation()
 }
 
 void FeatureAssociation::initializationValue() {
-  const size_t cloud_size = _N_scan * _horizontal_scan;
+  const size_t cloud_size = _vertical_scans * _horizontal_scans;
   cloudSmoothness.resize(cloud_size);
 
   downSizeFilter.setLeafSize(0.2, 0.2, 0.2);
@@ -277,7 +288,7 @@ void FeatureAssociation::AccumulateIMUShiftAndRotation() {
 
   int imuPointerBack = (imuPointerLast + imuQueLength - 1) % imuQueLength;
   double timeDiff = imuTime[imuPointerLast] - imuTime[imuPointerBack];
-  if (timeDiff < scanPeriod) {
+  if (timeDiff < _scan_period) {
     imuShift[imuPointerLast] = imuShift[imuPointerBack] +
                                imuVelo[imuPointerBack] * timeDiff +
                                acc * timeDiff * timeDiff / 2;
@@ -347,10 +358,10 @@ void FeatureAssociation::adjustDistortion() {
 
     float relTime = (ori - segInfo.startOrientation) / segInfo.orientationDiff;
     point.intensity =
-        int(segmentedCloud->points[i].intensity) + scanPeriod * relTime;
+        int(segmentedCloud->points[i].intensity) + _scan_period * relTime;
 
     if (imuPointerLast >= 0) {
-      float pointTime = relTime * scanPeriod;
+      float pointTime = relTime * _scan_period;
       imuPointerFront = imuPointerLastIteration;
       while (imuPointerFront != imuPointerLast) {
         if (timeScanCur + pointTime < imuTime[imuPointerFront]) {
@@ -506,7 +517,7 @@ void FeatureAssociation::extractFeatures() {
   surfPointsFlat->clear();
   surfPointsLessFlat->clear();
 
-  for (int i = 0; i < _N_scan; i++) {
+  for (int i = 0; i < _vertical_scans; i++) {
     surfPointsLessFlatScan->clear();
 
     for (int j = 0; j < 6; j++) {
@@ -527,7 +538,7 @@ void FeatureAssociation::extractFeatures() {
       for (int k = ep; k >= sp; k--) {
         int ind = cloudSmoothness[k].ind;
         if (cloudNeighborPicked[ind] == 0 &&
-            cloudCurvature[ind] > edgeThreshold &&
+            cloudCurvature[ind] > _edge_threshold &&
             segInfo.segmentedCloudGroundFlag[ind] == false) {
           largestPickedNum++;
           if (largestPickedNum <= 2) {
@@ -569,7 +580,7 @@ void FeatureAssociation::extractFeatures() {
       for (int k = sp; k <= ep; k++) {
         int ind = cloudSmoothness[k].ind;
         if (cloudNeighborPicked[ind] == 0 &&
-            cloudCurvature[ind] < surfThreshold &&
+            cloudCurvature[ind] < _surf_threshold &&
             segInfo.segmentedCloudGroundFlag[ind] == true) {
           cloudLabel[ind] = -1;
           surfPointsFlat->push_back(segmentedCloud->points[ind]);
@@ -849,12 +860,12 @@ void FeatureAssociation::findCorrespondingCornerFeatures(int iterCount) {
                                        pointSearchSqDis);
       int closestPointInd = -1, minPointInd2 = -1;
 
-      if (pointSearchSqDis[0] < nearestFeatureSearchSqDist) {
+      if (pointSearchSqDis[0] < _nearest_feature_dist_sqr) {
         closestPointInd = pointSearchInd[0];
         int closestPointScan =
             int(laserCloudCornerLast->points[closestPointInd].intensity);
 
-        float pointSqDis, minPointSqDis2 = nearestFeatureSearchSqDist;
+        float pointSqDis, minPointSqDis2 = _nearest_feature_dist_sqr;
         for (int j = closestPointInd + 1; j < cornerPointsSharpNum; j++) {
           if (int(laserCloudCornerLast->points[j].intensity) >
               closestPointScan + 2.5) {
@@ -967,13 +978,13 @@ void FeatureAssociation::findCorrespondingSurfFeatures(int iterCount) {
                                      pointSearchSqDis);
       int closestPointInd = -1, minPointInd2 = -1, minPointInd3 = -1;
 
-      if (pointSearchSqDis[0] < nearestFeatureSearchSqDist) {
+      if (pointSearchSqDis[0] < _nearest_feature_dist_sqr) {
         closestPointInd = pointSearchInd[0];
         int closestPointScan =
             int(laserCloudSurfLast->points[closestPointInd].intensity);
 
-        float pointSqDis, minPointSqDis2 = nearestFeatureSearchSqDist,
-                          minPointSqDis3 = nearestFeatureSearchSqDist;
+        float pointSqDis, minPointSqDis2 = _nearest_feature_dist_sqr,
+                          minPointSqDis3 = _nearest_feature_dist_sqr;
         for (int j = closestPointInd + 1; j < surfPointsFlatNum; j++) {
           if (int(laserCloudSurfLast->points[j].intensity) >
               closestPointScan + 2.5) {
@@ -1504,9 +1515,9 @@ void FeatureAssociation::updateInitialGuess() {
 
   if (imuVeloFromStart.x() != 0 || imuVeloFromStart.y() != 0 ||
       imuVeloFromStart.z() != 0) {
-    transformCur[3] -= imuVeloFromStart.x() * scanPeriod;
-    transformCur[4] -= imuVeloFromStart.y() * scanPeriod;
-    transformCur[5] -= imuVeloFromStart.z() * scanPeriod;
+    transformCur[3] -= imuVeloFromStart.x() * _scan_period;
+    transformCur[4] -= imuVeloFromStart.y() * _scan_period;
+    transformCur[5] -= imuVeloFromStart.z() * _scan_period;
   }
 }
 
@@ -1717,10 +1728,10 @@ void FeatureAssociation::runFeatureAssociation() {
     publishCloudsLast();  // cloud to mapOptimization
 
     //--------------
-    cycle_count++;
+    _cycle_count++;
 
-    if (cycle_count == mappingFrequencyDivider) {
-      cycle_count = 0;
+    if (_cycle_count == _mapping_frequency_div) {
+      _cycle_count = 0;
       AssociationOut out;
       out.cloud_corner_last.reset(new pcl::PointCloud<PointType>());
       out.cloud_surf_last.reset(new pcl::PointCloud<PointType>());

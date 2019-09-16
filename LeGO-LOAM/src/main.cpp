@@ -13,8 +13,8 @@ int main(int argc, char** argv) {
 
   ros::NodeHandle nh("~");
   std::string rosbag;
-  std::string imu_topic = pointCloudTopic;
-  std::string lidar_topic = imuTopic;
+  std::string imu_topic;
+  std::string lidar_topic;
 
   nh.getParam("rosbag", rosbag);
   nh.getParam("imu_topic", imu_topic);
@@ -37,9 +37,9 @@ int main(int argc, char** argv) {
   Channel<ProjectionOut> projection_out_channel(true);
   Channel<AssociationOut> association_out_channel(use_rosbag);
 
-  ImageProjection IP(nh, N_SCAN, HORIZONTAL_SCAN, projection_out_channel);
+  ImageProjection IP(nh, projection_out_channel);
 
-  FeatureAssociation FA(nh, N_SCAN, HORIZONTAL_SCAN, projection_out_channel,
+  FeatureAssociation FA(nh, projection_out_channel,
                         association_out_channel);
 
   MapOptimization MO(nh, association_out_channel);

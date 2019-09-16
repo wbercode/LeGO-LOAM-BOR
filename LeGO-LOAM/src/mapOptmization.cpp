@@ -56,7 +56,7 @@ MapOptimization::MapOptimization(ros::NodeHandle &node,
       nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 2);
   pubOdomAftMapped = nh.advertise<nav_msgs::Odometry>("/aft_mapped_to_init", 5);
 
-  subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 50,
+  subImu = nh.subscribe<sensor_msgs::Imu>("/imu/data", 50,
                                           &MapOptimization::imuHandler, this);
 
   pubHistoryKeyFrames =
@@ -85,6 +85,28 @@ MapOptimization::MapOptimization(ros::NodeHandle &node,
 
   aftMappedTrans.frame_id_ = "/camera_init";
   aftMappedTrans.child_frame_id_ = "/aft_mapped";
+
+  nh.getParam("/lego_loam/laser/scan_period", _scan_period);
+
+  nh.getParam("/lego_loam/mapping/enable_loop_closure", _loop_closure_enabled);
+
+  nh.getParam("/lego_loam/mapping/history_keyframe_search_radius",
+              _history_keyframe_search_radius);
+
+  nh.getParam("/lego_loam/mapping/history_keyframe_search_num",
+              _history_keyframe_search_num);
+
+  nh.getParam("/lego_loam/mapping/history_keyframe_fitness_score",
+              _history_keyframe_fitness_score);
+
+  nh.getParam("/lego_loam/mapping/surrounding_keyframe_search_radius",
+              _surrounding_keyframe_search_radius);
+
+  nh.getParam("/lego_loam/mapping/enable_loop_closure",
+              _surrounding_keyframe_search_num);
+
+  nh.getParam("/lego_loam/mapping/global_map_visualization_search_radius",
+              _global_map_visualization_search_radius);
 
   allocateMemory();
 
@@ -230,7 +252,7 @@ void MapOptimization::loopClosureThread()
   {
     bool ready;
     _loop_closure_signal.receive(ready);
-    if(ready && loopClosureEnableFlag){
+    if(ready && _loop_closure_enabled){
       performLoopClosure();
     }
   }
@@ -365,22 +387,22 @@ void MapOptimization::transformUpdate() {
   if (imuPointerLast >= 0) {
     float imuRollLast = 0, imuPitchLast = 0;
     while (imuPointerFront != imuPointerLast) {
-      if (timeLaserOdometry + scanPeriod < imuTime[imuPointerFront]) {
+      if (timeLaserOdometry + _scan_period < imuTime[imuPointerFront]) {
         break;
       }
       imuPointerFront = (imuPointerFront + 1) % imuQueLength;
     }
 
-    if (timeLaserOdometry + scanPeriod > imuTime[imuPointerFront]) {
+    if (timeLaserOdometry + _scan_period > imuTime[imuPointerFront]) {
       imuRollLast = imuRoll[imuPointerFront];
       imuPitchLast = imuPitch[imuPointerFront];
     } else {
       int imuPointerBack = (imuPointerFront + imuQueLength - 1) % imuQueLength;
       float ratioFront =
-          (timeLaserOdometry + scanPeriod - imuTime[imuPointerBack]) /
+          (timeLaserOdometry + _scan_period - imuTime[imuPointerBack]) /
           (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
       float ratioBack =
-          (imuTime[imuPointerFront] - timeLaserOdometry - scanPeriod) /
+          (imuTime[imuPointerFront] - timeLaserOdometry - _scan_period) /
           (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
 
       imuRollLast = imuRoll[imuPointerFront] * ratioFront +
@@ -590,7 +612,7 @@ void MapOptimization::publishGlobalMap() {
   mtx.lock();
   kdtreeGlobalMap.setInputCloud(cloudKeyPoses3D);
   kdtreeGlobalMap.radiusSearch(
-      currentRobotPosPoint, globalMapVisualizationSearchRadius,
+      currentRobotPosPoint, _global_map_visualization_search_radius,
       pointSearchIndGlobalMap, pointSearchSqDisGlobalMap);
   mtx.unlock();
 
@@ -638,7 +660,7 @@ bool MapOptimization::detectLoopClosure() {
   std::vector<float> pointSearchSqDisLoop;
   kdtreeHistoryKeyPoses.setInputCloud(cloudKeyPoses3D);
   kdtreeHistoryKeyPoses.radiusSearch(
-      currentRobotPosPoint, historyKeyframeSearchRadius, pointSearchIndLoop,
+      currentRobotPosPoint, _history_keyframe_search_radius, pointSearchIndLoop,
       pointSearchSqDisLoop);
 
   closestHistoryFrameID = -1;
@@ -671,7 +693,7 @@ bool MapOptimization::detectLoopClosure() {
   latestSurfKeyFrameCloud->clear();
   *latestSurfKeyFrameCloud = *hahaCloud;
   // save history near key frames
-  for (int j = -historyKeyframeSearchNum; j <= historyKeyframeSearchNum; ++j) {
+  for (int j = - _history_keyframe_search_num; j <= _history_keyframe_search_num; ++j) {
     if (closestHistoryFrameID + j < 0 ||
         closestHistoryFrameID + j > latestFrameIDLoopCloure)
       continue;
@@ -728,7 +750,7 @@ void MapOptimization::performLoopClosure() {
   icp.align(*unused_result);
 
   if (icp.hasConverged() == false ||
-      icp.getFitnessScore() > historyKeyframeFitnessScore)
+      icp.getFitnessScore() > _history_keyframe_fitness_score)
     return;
   // publish corrected cloud
   if (pubIcpKeyFrames.getNumSubscribers() != 0) {
@@ -788,10 +810,10 @@ void MapOptimization::performLoopClosure() {
 void MapOptimization::extractSurroundingKeyFrames() {
   if (cloudKeyPoses3D->points.empty() == true) return;
 
-  if (loopClosureEnableFlag == true) {
+  if (_loop_closure_enabled == true) {
     // only use recent key poses for graph building
     if (recentCornerCloudKeyFrames.size() <
-        surroundingKeyframeSearchNum) {  // queue is not full (the beginning
+        _surrounding_keyframe_search_num) {  // queue is not full (the beginning
                                          // of mapping or a loop is just
                                          // closed)
                                          // clear recent key frames queue
@@ -810,7 +832,7 @@ void MapOptimization::extractSurroundingKeyFrames() {
             transformPointCloud(surfCloudKeyFrames[thisKeyInd]));
         recentOutlierCloudKeyFrames.push_front(
             transformPointCloud(outlierCloudKeyFrames[thisKeyInd]));
-        if (recentCornerCloudKeyFrames.size() >= surroundingKeyframeSearchNum)
+        if (recentCornerCloudKeyFrames.size() >= _surrounding_keyframe_search_num)
           break;
       }
     } else {  // queue is full, pop the oldest key frame and push the latest
@@ -847,7 +869,7 @@ void MapOptimization::extractSurroundingKeyFrames() {
     // extract all the nearby key poses and downsample them
     kdtreeSurroundingKeyPoses.setInputCloud(cloudKeyPoses3D);
     kdtreeSurroundingKeyPoses.radiusSearch(
-        currentRobotPosPoint, (double)surroundingKeyframeSearchRadius,
+        currentRobotPosPoint, (double)_surrounding_keyframe_search_radius,
         pointSearchInd, pointSearchSqDis);
 
     for (int i = 0; i < pointSearchInd.size(); ++i){

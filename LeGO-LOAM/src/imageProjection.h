@@ -9,8 +9,6 @@ class ImageProjection {
  public:
 
   ImageProjection(ros::NodeHandle& nh,
-                  size_t N_scan,
-                  size_t horizontal_scan,
                   Channel<ProjectionOut>& output_channel);
 
   ~ImageProjection() = default;
@@ -37,8 +35,19 @@ class ImageProjection {
   pcl::PointCloud<PointType>::Ptr _outlier_cloud;
 
   ros::NodeHandle& _nh;
-  const size_t _N_scan;
-  const size_t _horizon_scan;
+  int _vertical_scans;
+  int _horizontal_scans;
+  float _ang_bottom;
+  float _ang_resolution_X;
+  float _ang_resolution_Y;
+  float _segment_alpha_X;
+  float _segment_alpha_Y;
+  float _segment_theta;
+  int _segment_valid_point_num;
+  int _segment_valid_line_num;
+  int _ground_scan_index;
+  float _sensor_mount_angle;
+
   Channel<ProjectionOut>& _output_channel;
 
   ros::Subscriber _sub_laser_cloud;

@@ -18,7 +18,7 @@
     <rosparam file="$(find lego_loam)/config/loam_config.yaml" command="load"/>
 
     <node pkg="lego_loam" type="lego_loam"    name="lego_loam"    output="screen" >
-       <remap from="/velodyne_points" to="$(arg lidar_topic)"/>
+       <remap from="/lidar_points" to="$(arg lidar_topic)"/>
        <remap from="/imu/data" to="$(arg imu_topic)"/>
        <param name="rosbag"      value="$(arg rosbag)" type="string" />
        <param name="imu_topic"   value="$(arg imu_topic)" type="string" />

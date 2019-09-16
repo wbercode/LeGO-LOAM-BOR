@@ -11,8 +11,6 @@ class FeatureAssociation {
 
  public:
   FeatureAssociation( ros::NodeHandle& node,
-                     size_t N_scan,
-                     size_t horizontal_scan,
                      Channel<ProjectionOut>& input_channel,
                      Channel<AssociationOut>& output_channel);
 
@@ -22,10 +20,18 @@ class FeatureAssociation {
   void runFeatureAssociation();
 
  private:
+
+  enum {imuQueLength = 200};
+
   ros::NodeHandle& nh;
 
-  const size_t _N_scan;
-  const size_t _horizontal_scan;
+  int _N_scan;
+  int _horizontal_scan;
+  float _scan_period;
+  float _edge_threshold;
+  float _surf_threshold;
+  float _nearest_feature_dist_sqr;
+  int _mapping_frequency_div;
 
   std::mutex _imu_mutex;
   std::thread _run_thread;
@@ -145,7 +151,7 @@ class FeatureAssociation {
   bool isDegenerate;
 
   int frameCount;
-  size_t cycle_count;
+  size_t _cycle_count;
 
  private:
   void initializationValue();
