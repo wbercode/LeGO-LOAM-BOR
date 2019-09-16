@@ -25,8 +25,8 @@ class FeatureAssociation {
 
   ros::NodeHandle& nh;
 
-  int _N_scan;
-  int _horizontal_scan;
+  int _vertical_scans;
+  int _horizontal_scans;
   float _scan_period;
   float _edge_threshold;
   float _surf_threshold;
