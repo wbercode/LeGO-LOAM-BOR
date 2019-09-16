@@ -79,7 +79,7 @@ Lidar odometry performs two-step Levenberg Marquardt optimization to get 6D tran
     <img src="/LeGO-LOAM/launch/odometry.jpg" alt="drawing" width="400"/>
 </p>
 
-## New sensor anf configuration
+## New sensor and configuration
 
 To customize the behavior of the algorithm or to use a lidar different from VLP-16, edit the file **config/loam_config.yaml**.
 
@@ -91,7 +91,7 @@ If the point cloud is not projected properly, you will lose many points and perf
 If you are using your lidar with an IMU, make sure your IMU is aligned properly with the lidar.
 The algorithm uses IMU data to correct the point cloud distortion that is cause by sensor motion.
 
-**If the IMU is not aligned properly, the usage of IMU data will deteriorate the result. **
+**If the IMU is not aligned properly, the usage of IMU data will deteriorate the result.**
 
 This limitation will be fixed in the future.
 
