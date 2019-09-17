@@ -25,7 +25,7 @@ lego_loam:
         mapping_frequency_divider: 5
 
         surrounding_keyframe_search_radius: 50.0   # key frame that is within n meters from current pose will be
-                                                   #considerd for scan-to-map optimization (when loop closure disabled)
+                                                   # considered for scan-to-map optimization (when loop closure disabled)
         surrounding_keyframe_search_num: 50        # submap size (when loop closure enabled)
 
         history_keyframe_search_radius: 7.0        # key frame that is within n meters from current pose will be considerd for loop closure

@@ -102,7 +102,7 @@ MapOptimization::MapOptimization(ros::NodeHandle &node,
   nh.getParam("/lego_loam/mapping/surrounding_keyframe_search_radius",
               _surrounding_keyframe_search_radius);
 
-  nh.getParam("/lego_loam/mapping/enable_loop_closure",
+  nh.getParam("/lego_loam/mapping/surrounding_keyframe_search_num",
               _surrounding_keyframe_search_num);
 
   nh.getParam("/lego_loam/mapping/global_map_visualization_search_radius",
@@ -723,6 +723,7 @@ void MapOptimization::performLoopClosure() {
 
   if (cloudKeyPoses3D->points.empty() == true)
     return;
+
 
   // try to find close key frame if there are any
   if (potentialLoopFlag == false) {
