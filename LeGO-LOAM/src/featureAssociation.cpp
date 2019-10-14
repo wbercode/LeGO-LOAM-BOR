@@ -44,8 +44,6 @@ FeatureAssociation::FeatureAssociation(ros::NodeHandle &node,
     : nh(node),
       _input_channel(input_channel),
       _output_channel(output_channel) {
-  subImu = nh.subscribe<sensor_msgs::Imu>(
-      "/imu/data", 50, &FeatureAssociation::imuHandler, this);
 
   pubCornerPointsSharp =
       nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 1);
@@ -123,48 +121,6 @@ void FeatureAssociation::initializationValue() {
   systemInitCount = 0;
   systemInited = false;
 
-  imuPointerFront = 0;
-  imuPointerLast = -1;
-  imuPointerLastIteration = 0;
-
-  imuRollStart = 0;
-  imuPitchStart = 0;
-  imuYawStart = 0;
-  cosImuRollStart = 0;
-  cosImuPitchStart = 0;
-  cosImuYawStart = 0;
-  sinImuRollStart = 0;
-  sinImuPitchStart = 0;
-  sinImuYawStart = 0;
-  imuRollCur = 0;
-  imuPitchCur = 0;
-  imuYawCur = 0;
-
-  imuVeloStart.setZero();
-  imuShiftStart.setZero();
-
-  imuVeloCur.setZero();
-  imuShiftCur.setZero();
-
-  imuShiftFromStartCur.setZero();
-  imuVeloFromStartCur.setZero();
-
-  imuAngularRotationCur.setZero();
-  imuAngularRotationLast.setZero();
-  imuAngularFromStart.setZero();
-
-  for (int i = 0; i < imuQueLength; ++i) {
-    imuTime[i] = 0;
-    imuRoll[i] = 0;
-    imuPitch[i] = 0;
-    imuYaw[i] = 0;
-    imuAcc[i].setZero();
-    imuVelo[i].setZero();
-    imuShift[i].setZero();
-    imuAngularVelo[i].setZero();
-    imuAngularRotation[i].setZero();
-  }
-
   skipFrameNum = 1;
 
   for (int i = 0; i < 6; ++i) {
@@ -173,12 +129,6 @@ void FeatureAssociation::initializationValue() {
   }
 
   systemInitedLM = false;
-
-  imuRollLast = 0;
-  imuPitchLast = 0;
-  imuYawLast = 0;
-  imuShiftFromStart.setZero();
-  imuVeloFromStart.setZero();
 
   laserCloudCornerLast.reset(new pcl::PointCloud<PointType>());
   laserCloudSurfLast.reset(new pcl::PointCloud<PointType>());
@@ -194,138 +144,6 @@ void FeatureAssociation::initializationValue() {
   isDegenerate = false;
 
   frameCount = skipFrameNum;
-}
-
-void FeatureAssociation::updateImuRollPitchYawStartSinCos() {
-  cosImuRollStart = cos(imuRollStart);
-  cosImuPitchStart = cos(imuPitchStart);
-  cosImuYawStart = cos(imuYawStart);
-  sinImuRollStart = sin(imuRollStart);
-  sinImuPitchStart = sin(imuPitchStart);
-  sinImuYawStart = sin(imuYawStart);
-}
-
-void FeatureAssociation::ShiftToStartIMU(float pointTime) {
-  imuShiftFromStartCur = imuShiftCur - imuShiftStart - imuVeloStart * pointTime;
-
-  float x1 = cosImuYawStart * imuShiftFromStartCur.x() -
-             sinImuYawStart * imuShiftFromStartCur.z();
-  float y1 = imuShiftFromStartCur.y();
-  float z1 = sinImuYawStart * imuShiftFromStartCur.x() +
-             cosImuYawStart * imuShiftFromStartCur.z();
-
-  float x2 = x1;
-  float y2 = cosImuPitchStart * y1 + sinImuPitchStart * z1;
-  float z2 = -sinImuPitchStart * y1 + cosImuPitchStart * z1;
-
-  imuShiftFromStartCur.x() = cosImuRollStart * x2 + sinImuRollStart * y2;
-  imuShiftFromStartCur.y() = -sinImuRollStart * x2 + cosImuRollStart * y2;
-  imuShiftFromStartCur.z() = z2;
-}
-
-void FeatureAssociation::VeloToStartIMU() {
-  imuVeloFromStartCur = imuVeloCur - imuVeloStart;
-
-  float x1 = cosImuYawStart * imuVeloFromStartCur.x() -
-             sinImuYawStart * imuVeloFromStartCur.z();
-  float y1 = imuVeloFromStartCur.y();
-  float z1 = sinImuYawStart * imuVeloFromStartCur.x() +
-             cosImuYawStart * imuVeloFromStartCur.z();
-
-  float x2 = x1;
-  float y2 = cosImuPitchStart * y1 + sinImuPitchStart * z1;
-  float z2 = -sinImuPitchStart * y1 + cosImuPitchStart * z1;
-
-  imuVeloFromStartCur.x() = cosImuRollStart * x2 + sinImuRollStart * y2;
-  imuVeloFromStartCur.y() = -sinImuRollStart * x2 + cosImuRollStart * y2;
-  imuVeloFromStartCur.z() = z2;
-}
-
-void FeatureAssociation::TransformToStartIMU(PointType *p) {
-  float x1 = cos(imuRollCur) * p->x - sin(imuRollCur) * p->y;
-  float y1 = sin(imuRollCur) * p->x + cos(imuRollCur) * p->y;
-  float z1 = p->z;
-
-  float x2 = x1;
-  float y2 = cos(imuPitchCur) * y1 - sin(imuPitchCur) * z1;
-  float z2 = sin(imuPitchCur) * y1 + cos(imuPitchCur) * z1;
-
-  float x3 = cos(imuYawCur) * x2 + sin(imuYawCur) * z2;
-  float y3 = y2;
-  float z3 = -sin(imuYawCur) * x2 + cos(imuYawCur) * z2;
-
-  float x4 = cosImuYawStart * x3 - sinImuYawStart * z3;
-  float y4 = y3;
-  float z4 = sinImuYawStart * x3 + cosImuYawStart * z3;
-
-  float x5 = x4;
-  float y5 = cosImuPitchStart * y4 + sinImuPitchStart * z4;
-  float z5 = -sinImuPitchStart * y4 + cosImuPitchStart * z4;
-
-  p->x = cosImuRollStart * x5 + sinImuRollStart * y5 + imuShiftFromStartCur.x();
-  p->y =
-      -sinImuRollStart * x5 + cosImuRollStart * y5 + imuShiftFromStartCur.y();
-  p->z = z5 + imuShiftFromStartCur.z();
-}
-
-void FeatureAssociation::AccumulateIMUShiftAndRotation() {
-  float roll = imuRoll[imuPointerLast];
-  float pitch = imuPitch[imuPointerLast];
-  float yaw = imuYaw[imuPointerLast];
-  Vector3 acc = imuAcc[imuPointerLast];
-
-  float x1 = cos(roll) * acc.x() - sin(roll) * acc.y();
-  float y1 = sin(roll) * acc.x() + cos(roll) * acc.y();
-  float z1 = acc.z();
-
-  float x2 = x1;
-  float y2 = cos(pitch) * y1 - sin(pitch) * z1;
-  float z2 = sin(pitch) * y1 + cos(pitch) * z1;
-
-  acc.x() = cos(yaw) * x2 + sin(yaw) * z2;
-  acc.y() = y2;
-  acc.z() = -sin(yaw) * x2 + cos(yaw) * z2;
-
-  int imuPointerBack = (imuPointerLast + imuQueLength - 1) % imuQueLength;
-  double timeDiff = imuTime[imuPointerLast] - imuTime[imuPointerBack];
-  if (timeDiff < _scan_period) {
-    imuShift[imuPointerLast] = imuShift[imuPointerBack] +
-                               imuVelo[imuPointerBack] * timeDiff +
-                               acc * timeDiff * timeDiff / 2;
-
-    imuVelo[imuPointerLast] = imuVelo[imuPointerBack] + acc * timeDiff;
-
-    imuAngularRotation[imuPointerLast] =
-        imuAngularRotation[imuPointerBack] +
-        imuAngularVelo[imuPointerBack] * timeDiff;
-  }
-}
-
-void FeatureAssociation::imuHandler(const sensor_msgs::Imu::ConstPtr &imuIn) {
-  std::lock_guard<std::mutex> lock(_imu_mutex);
-  double roll, pitch, yaw;
-  tf::Quaternion orientation;
-  tf::quaternionMsgToTF(imuIn->orientation, orientation);
-  tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-
-  float accX = imuIn->linear_acceleration.y - sin(roll) * cos(pitch) * 9.81;
-  float accY = imuIn->linear_acceleration.z - cos(roll) * cos(pitch) * 9.81;
-  float accZ = imuIn->linear_acceleration.x + sin(pitch) * 9.81;
-
-  imuPointerLast = (imuPointerLast + 1) % imuQueLength;
-
-  imuTime[imuPointerLast] = imuIn->header.stamp.toSec();
-
-  imuRoll[imuPointerLast] = roll;
-  imuPitch[imuPointerLast] = pitch;
-  imuYaw[imuPointerLast] = yaw;
-
-  imuAcc[imuPointerLast] = {accX, accY, accZ};
-
-  imuAngularVelo[imuPointerLast] = {imuIn->angular_velocity.x,
-                                    imuIn->angular_velocity.y,
-                                    imuIn->angular_velocity.z};
-  AccumulateIMUShiftAndRotation();
 }
 
 void FeatureAssociation::adjustDistortion() {
@@ -360,92 +178,8 @@ void FeatureAssociation::adjustDistortion() {
     point.intensity =
         int(segmentedCloud->points[i].intensity) + _scan_period * relTime;
 
-    if (imuPointerLast >= 0) {
-      float pointTime = relTime * _scan_period;
-      imuPointerFront = imuPointerLastIteration;
-      while (imuPointerFront != imuPointerLast) {
-        if (timeScanCur + pointTime < imuTime[imuPointerFront]) {
-          break;
-        }
-        imuPointerFront = (imuPointerFront + 1) % imuQueLength;
-      }
-
-      if (timeScanCur + pointTime > imuTime[imuPointerFront]) {
-        imuRollCur = imuRoll[imuPointerFront];
-        imuPitchCur = imuPitch[imuPointerFront];
-        imuYawCur = imuYaw[imuPointerFront];
-
-        imuVeloCur = imuVelo[imuPointerFront];
-        imuShiftCur = imuShift[imuPointerFront];
-
-      } else {
-        int imuPointerBack =
-            (imuPointerFront + imuQueLength - 1) % imuQueLength;
-        float ratioFront = (timeScanCur + pointTime - imuTime[imuPointerBack]) /
-                           (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-        float ratioBack = (imuTime[imuPointerFront] - timeScanCur - pointTime) /
-                          (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-
-        imuRollCur = imuRoll[imuPointerFront] * ratioFront +
-                     imuRoll[imuPointerBack] * ratioBack;
-        imuPitchCur = imuPitch[imuPointerFront] * ratioFront +
-                      imuPitch[imuPointerBack] * ratioBack;
-        if (imuYaw[imuPointerFront] - imuYaw[imuPointerBack] > M_PI) {
-          imuYawCur = imuYaw[imuPointerFront] * ratioFront +
-                      (imuYaw[imuPointerBack] + 2 * M_PI) * ratioBack;
-        } else if (imuYaw[imuPointerFront] - imuYaw[imuPointerBack] < -M_PI) {
-          imuYawCur = imuYaw[imuPointerFront] * ratioFront +
-                      (imuYaw[imuPointerBack] - 2 * M_PI) * ratioBack;
-        } else {
-          imuYawCur = imuYaw[imuPointerFront] * ratioFront +
-                      imuYaw[imuPointerBack] * ratioBack;
-        }
-
-        imuVeloCur = imuVelo[imuPointerFront] * ratioFront +
-                     imuVelo[imuPointerBack] * ratioBack;
-
-        imuShiftCur = imuShift[imuPointerFront] * ratioFront +
-                      imuShift[imuPointerBack] * ratioBack;
-      }
-
-      if (i == 0) {
-        imuRollStart = imuRollCur;
-        imuPitchStart = imuPitchCur;
-        imuYawStart = imuYawCur;
-
-        imuVeloStart = imuVeloCur;
-        imuShiftStart = imuShiftCur;
-
-        if (timeScanCur + pointTime > imuTime[imuPointerFront]) {
-          imuAngularRotationCur = imuAngularRotation[imuPointerFront];
-        } else {
-          int imuPointerBack =
-              (imuPointerFront + imuQueLength - 1) % imuQueLength;
-          float ratioFront =
-              (timeScanCur + pointTime - imuTime[imuPointerBack]) /
-              (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-          float ratioBack =
-              (imuTime[imuPointerFront] - timeScanCur - pointTime) /
-              (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-          imuAngularRotationCur =
-              imuAngularRotation[imuPointerFront] * ratioFront +
-              imuAngularRotation[imuPointerBack] * ratioBack;
-        }
-
-        imuAngularFromStart = imuAngularRotationCur - imuAngularRotationLast;
-
-        imuAngularRotationLast = imuAngularRotationCur;
-
-        updateImuRollPitchYawStartSinCos();
-      } else {
-        VeloToStartIMU();
-        TransformToStartIMU(&point);
-      }
-    }
     segmentedCloud->points[i] = point;
   }
-
-  imuPointerLastIteration = imuPointerLast;
 }
 
 void FeatureAssociation::calculateSmoothness() {
@@ -698,127 +432,12 @@ void FeatureAssociation::TransformToEnd(PointType const *const pi,
   float y6 = sin(rz) * x5 + cos(rz) * y5 + ty;
   float z6 = z5 + tz;
 
-  float x7 = cosImuRollStart * (x6 - imuShiftFromStart.x()) -
-             sinImuRollStart * (y6 - imuShiftFromStart.y());
-  float y7 = sinImuRollStart * (x6 - imuShiftFromStart.x()) +
-             cosImuRollStart * (y6 - imuShiftFromStart.y());
-  float z7 = z6 - imuShiftFromStart.z();
-
-  float x8 = x7;
-  float y8 = cosImuPitchStart * y7 - sinImuPitchStart * z7;
-  float z8 = sinImuPitchStart * y7 + cosImuPitchStart * z7;
-
-  float x9 = cosImuYawStart * x8 + sinImuYawStart * z8;
-  float y9 = y8;
-  float z9 = -sinImuYawStart * x8 + cosImuYawStart * z8;
-
-  float x10 = cos(imuYawLast) * x9 - sin(imuYawLast) * z9;
-  float y10 = y9;
-  float z10 = sin(imuYawLast) * x9 + cos(imuYawLast) * z9;
-
-  float x11 = x10;
-  float y11 = cos(imuPitchLast) * y10 + sin(imuPitchLast) * z10;
-  float z11 = -sin(imuPitchLast) * y10 + cos(imuPitchLast) * z10;
-
-  po->x = cos(imuRollLast) * x11 + sin(imuRollLast) * y11;
-  po->y = -sin(imuRollLast) * x11 + cos(imuRollLast) * y11;
-  po->z = z11;
+  po->x = x6;
+  po->y = y6;
+  po->z = z6;
   po->intensity = int(pi->intensity);
 }
 
-void FeatureAssociation::PluginIMURotation(float bcx, float bcy, float bcz,
-                                           float blx, float bly, float blz,
-                                           float alx, float aly, float alz,
-                                           float &acx, float &acy, float &acz) {
-  float sbcx = sin(bcx);
-  float cbcx = cos(bcx);
-  float sbcy = sin(bcy);
-  float cbcy = cos(bcy);
-  float sbcz = sin(bcz);
-  float cbcz = cos(bcz);
-
-  float sblx = sin(blx);
-  float cblx = cos(blx);
-  float sbly = sin(bly);
-  float cbly = cos(bly);
-  float sblz = sin(blz);
-  float cblz = cos(blz);
-
-  float salx = sin(alx);
-  float calx = cos(alx);
-  float saly = sin(aly);
-  float caly = cos(aly);
-  float salz = sin(alz);
-  float calz = cos(alz);
-
-  float srx = -sbcx * (salx * sblx + calx * caly * cblx * cbly +
-                       calx * cblx * saly * sbly) -
-              cbcx * cbcz *
-                  (calx * saly * (cbly * sblz - cblz * sblx * sbly) -
-                   calx * caly * (sbly * sblz + cbly * cblz * sblx) +
-                   cblx * cblz * salx) -
-              cbcx * sbcz *
-                  (calx * caly * (cblz * sbly - cbly * sblx * sblz) -
-                   calx * saly * (cbly * cblz + sblx * sbly * sblz) +
-                   cblx * salx * sblz);
-  acx = -asin(srx);
-
-  float srycrx =
-      (cbcy * sbcz - cbcz * sbcx * sbcy) *
-          (calx * saly * (cbly * sblz - cblz * sblx * sbly) -
-           calx * caly * (sbly * sblz + cbly * cblz * sblx) +
-           cblx * cblz * salx) -
-      (cbcy * cbcz + sbcx * sbcy * sbcz) *
-          (calx * caly * (cblz * sbly - cbly * sblx * sblz) -
-           calx * saly * (cbly * cblz + sblx * sbly * sblz) +
-           cblx * salx * sblz) +
-      cbcx * sbcy *
-          (salx * sblx + calx * caly * cblx * cbly + calx * cblx * saly * sbly);
-  float crycrx =
-      (cbcz * sbcy - cbcy * sbcx * sbcz) *
-          (calx * caly * (cblz * sbly - cbly * sblx * sblz) -
-           calx * saly * (cbly * cblz + sblx * sbly * sblz) +
-           cblx * salx * sblz) -
-      (sbcy * sbcz + cbcy * cbcz * sbcx) *
-          (calx * saly * (cbly * sblz - cblz * sblx * sbly) -
-           calx * caly * (sbly * sblz + cbly * cblz * sblx) +
-           cblx * cblz * salx) +
-      cbcx * cbcy *
-          (salx * sblx + calx * caly * cblx * cbly + calx * cblx * saly * sbly);
-  acy = atan2(srycrx / cos(acx), crycrx / cos(acx));
-
-  float srzcrx = sbcx * (cblx * cbly * (calz * saly - caly * salx * salz) -
-                         cblx * sbly * (caly * calz + salx * saly * salz) +
-                         calx * salz * sblx) -
-                 cbcx * cbcz *
-                     ((caly * calz + salx * saly * salz) *
-                          (cbly * sblz - cblz * sblx * sbly) +
-                      (calz * saly - caly * salx * salz) *
-                          (sbly * sblz + cbly * cblz * sblx) -
-                      calx * cblx * cblz * salz) +
-                 cbcx * sbcz *
-                     ((caly * calz + salx * saly * salz) *
-                          (cbly * cblz + sblx * sbly * sblz) +
-                      (calz * saly - caly * salx * salz) *
-                          (cblz * sbly - cbly * sblx * sblz) +
-                      calx * cblx * salz * sblz);
-  float crzcrx = sbcx * (cblx * sbly * (caly * salz - calz * salx * saly) -
-                         cblx * cbly * (saly * salz + caly * calz * salx) +
-                         calx * calz * sblx) +
-                 cbcx * cbcz *
-                     ((saly * salz + caly * calz * salx) *
-                          (sbly * sblz + cbly * cblz * sblx) +
-                      (caly * salz - calz * salx * saly) *
-                          (cbly * sblz - cblz * sblx * sbly) +
-                      calx * calz * cblx * cblz) -
-                 cbcx * sbcz *
-                     ((saly * salz + caly * calz * salx) *
-                          (cblz * sbly - cbly * sblx * sblz) +
-                      (caly * salz - calz * salx * saly) *
-                          (cbly * cblz + sblx * sbly * sblz) -
-                      calx * calz * cblx * sblz);
-  acz = atan2(srzcrx / cos(acx), crzcrx / cos(acx));
-}
 
 void FeatureAssociation::AccumulateRotation(float cx, float cy, float cz,
                                             float lx, float ly, float lz,
@@ -1492,33 +1111,7 @@ void FeatureAssociation::checkSystemInitialization() {
   laserCloudSurfLast2.header.frame_id = "/camera";
   _pub_cloud_surf_last.publish(laserCloudSurfLast2);
 
-  transformSum[0] += imuPitchStart;
-  transformSum[2] += imuRollStart;
-
   systemInitedLM = true;
-}
-
-void FeatureAssociation::updateInitialGuess() {
-  imuPitchLast = imuPitchCur;
-  imuYawLast = imuYawCur;
-  imuRollLast = imuRollCur;
-
-  imuShiftFromStart = imuShiftFromStartCur;
-  imuVeloFromStart = imuVeloFromStartCur;
-
-  if (imuAngularFromStart.x() != 0 || imuAngularFromStart.y() != 0 ||
-      imuAngularFromStart.z() != 0) {
-    transformCur[0] = -imuAngularFromStart.y();
-    transformCur[1] = -imuAngularFromStart.z();
-    transformCur[2] = -imuAngularFromStart.x();
-  }
-
-  if (imuVeloFromStart.x() != 0 || imuVeloFromStart.y() != 0 ||
-      imuVeloFromStart.z() != 0) {
-    transformCur[3] -= imuVeloFromStart.x() * _scan_period;
-    transformCur[4] -= imuVeloFromStart.y() * _scan_period;
-    transformCur[5] -= imuVeloFromStart.z() * _scan_period;
-  }
 }
 
 void FeatureAssociation::updateTransformation() {
@@ -1551,11 +1144,11 @@ void FeatureAssociation::integrateTransformation() {
                      -transformCur[0], -transformCur[1], -transformCur[2], rx,
                      ry, rz);
 
-  float x1 = cos(rz) * (transformCur[3] - imuShiftFromStart.x()) -
-             sin(rz) * (transformCur[4] - imuShiftFromStart.y());
-  float y1 = sin(rz) * (transformCur[3] - imuShiftFromStart.x()) +
-             cos(rz) * (transformCur[4] - imuShiftFromStart.y());
-  float z1 = transformCur[5] - imuShiftFromStart.z();
+  float x1 = cos(rz) * (transformCur[3] ) -
+             sin(rz) * (transformCur[4] );
+  float y1 = sin(rz) * (transformCur[3] ) +
+             cos(rz) * (transformCur[4] );
+  float z1 = transformCur[5];
 
   float x2 = x1;
   float y2 = cos(rx) * y1 - sin(rx) * z1;
@@ -1564,9 +1157,6 @@ void FeatureAssociation::integrateTransformation() {
   tx = transformSum[3] - (cos(ry) * x2 + sin(ry) * z2);
   ty = transformSum[4] - y2;
   tz = transformSum[5] - (-sin(ry) * x2 + cos(ry) * z2);
-
-  PluginIMURotation(rx, ry, rz, imuPitchStart, imuYawStart, imuRollStart,
-                    imuPitchLast, imuYawLast, imuRollLast, rx, ry, rz);
 
   transformSum[0] = rx;
   transformSum[1] = ry;
@@ -1630,7 +1220,6 @@ void FeatureAssociation::publishCloud() {
 }
 
 void FeatureAssociation::publishCloudsLast() {
-  updateImuRollPitchYawStartSinCos();
 
   int cornerPointsLessSharpNum = cornerPointsLessSharp->points.size();
   for (int i = 0; i < cornerPointsLessSharpNum; i++) {
@@ -1691,8 +1280,6 @@ void FeatureAssociation::runFeatureAssociation() {
     if( !ros::ok() ) break;
 
     //--------------
-    std::lock_guard<std::mutex> lock(_imu_mutex);
-
     outlierCloud = projection.outlier_cloud;
     segmentedCloud = projection.segmented_cloud;
     segInfo = std::move(projection.seg_msg);
@@ -1716,8 +1303,6 @@ void FeatureAssociation::runFeatureAssociation() {
       checkSystemInitialization();
       continue;
     }
-
-    updateInitialGuess();
 
     updateTransformation();
 

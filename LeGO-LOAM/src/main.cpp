@@ -77,13 +77,6 @@ int main(int argc, char** argv) {
         //ROS_INFO("cloud");
       }
 
-      const sensor_msgs::Imu::ConstPtr imu = m.instantiate<sensor_msgs::Imu>();
-      if (imu != NULL){
-        FA.imuHandler(imu);
-        MO.imuHandler(imu);
-       // ROS_INFO("imu");
-      }
-
       rosgraph_msgs::Clock clock_msg;
       clock_msg.clock = m.getTime();
       clock_publisher.publish( clock_msg );

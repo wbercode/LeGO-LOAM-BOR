@@ -16,12 +16,9 @@ class FeatureAssociation {
 
   ~FeatureAssociation();
 
-  void imuHandler(const sensor_msgs::Imu::ConstPtr &imuIn) ;
   void runFeatureAssociation();
 
  private:
-
-  enum {imuQueLength = 200};
 
   ros::NodeHandle& nh;
 
@@ -33,13 +30,10 @@ class FeatureAssociation {
   float _nearest_feature_dist_sqr;
   int _mapping_frequency_div;
 
-  std::mutex _imu_mutex;
   std::thread _run_thread;
 
   Channel<ProjectionOut>& _input_channel;
   Channel<AssociationOut>& _output_channel;
-
-  ros::Subscriber subImu;
 
   ros::Publisher pubCornerPointsSharp;
   ros::Publisher pubCornerPointsLessSharp;
@@ -72,39 +66,6 @@ class FeatureAssociation {
   std::vector<int> cloudNeighborPicked;
   std::vector<int> cloudLabel;
 
-  int imuPointerFront;
-  int imuPointerLast;
-  int imuPointerLastIteration;
-
-  float imuRollStart, imuPitchStart, imuYawStart;
-  float cosImuRollStart, cosImuPitchStart, cosImuYawStart, sinImuRollStart,
-      sinImuPitchStart, sinImuYawStart;
-  float imuRollCur, imuPitchCur, imuYawCur;
-
-  Vector3 imuVeloStart;
-  Vector3 imuShiftStart;
-
-  Vector3 imuVeloCur;
-  Vector3 imuShiftCur;
-
-  Vector3 imuShiftFromStartCur;
-  Vector3 imuVeloFromStartCur;
-
-  Vector3 imuAngularRotationCur;
-  Vector3 imuAngularRotationLast;
-  Vector3 imuAngularFromStart;
-
-  double imuTime[imuQueLength];
-  float imuRoll[imuQueLength];
-  float imuPitch[imuQueLength];
-  float imuYaw[imuQueLength];
-
-  Vector3 imuAcc[imuQueLength];
-  Vector3 imuVelo[imuQueLength];
-  Vector3 imuShift[imuQueLength];
-  Vector3 imuAngularVelo[imuQueLength];
-  Vector3 imuAngularRotation[imuQueLength];
-
   ros::Publisher _pub_cloud_corner_last;
   ros::Publisher _pub_cloud_surf_last;
   ros::Publisher pubLaserOdometry;
@@ -127,10 +88,6 @@ class FeatureAssociation {
 
   float transformCur[6];
   float transformSum[6];
-
-  float imuRollLast, imuPitchLast, imuYawLast;
-  Vector3 imuShiftFromStart;
-  Vector3 imuVeloFromStart;
 
   pcl::PointCloud<PointType>::Ptr laserCloudCornerLast;
   pcl::PointCloud<PointType>::Ptr laserCloudSurfLast;
@@ -155,11 +112,6 @@ class FeatureAssociation {
 
  private:
   void initializationValue();
-  void updateImuRollPitchYawStartSinCos();
-  void ShiftToStartIMU(float pointTime);
-  void VeloToStartIMU();
-  void TransformToStartIMU(PointType *p);
-  void AccumulateIMUShiftAndRotation();
   void adjustDistortion();
   void calculateSmoothness();
   void markOccludedPoints();
@@ -168,9 +120,6 @@ class FeatureAssociation {
   void TransformToStart(PointType const *const pi, PointType *const po);
   void TransformToEnd(PointType const *const pi, PointType *const po);
 
-  void PluginIMURotation(float bcx, float bcy, float bcz, float blx, float bly,
-                         float blz, float alx, float aly, float alz, float &acx,
-                         float &acy, float &acz);
   void AccumulateRotation(float cx, float cy, float cz, float lx, float ly,
                           float lz, float &ox, float &oy, float &oz);
 
@@ -182,7 +131,6 @@ class FeatureAssociation {
   bool calculateTransformation(int iterCount);
 
   void checkSystemInitialization();
-  void updateInitialGuess();
   void updateTransformation();
 
   void integrateTransformation();

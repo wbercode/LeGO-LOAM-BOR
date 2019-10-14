@@ -56,9 +56,6 @@ MapOptimization::MapOptimization(ros::NodeHandle &node,
       nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 2);
   pubOdomAftMapped = nh.advertise<nav_msgs::Odometry>("/aft_mapped_to_init", 5);
 
-  subImu = nh.subscribe<sensor_msgs::Imu>("/imu/data", 50,
-                                          &MapOptimization::imuHandler, this);
-
   pubHistoryKeyFrames =
       nh.advertise<sensor_msgs::PointCloud2>("/history_cloud", 2);
   pubIcpKeyFrames =
@@ -193,15 +190,6 @@ void MapOptimization::allocateMemory() {
     transformTobeMapped[i] = 0;
     transformBefMapped[i] = 0;
     transformAftMapped[i] = 0;
-  }
-
-  imuPointerFront = 0;
-  imuPointerLast = -1;
-
-  for (int i = 0; i < imuQueLength; ++i) {
-    imuTime[i] = 0;
-    imuRoll[i] = 0;
-    imuPitch[i] = 0;
   }
 
   gtsam::Vector Vector6(6);
@@ -384,38 +372,6 @@ void MapOptimization::transformAssociateToMap() {
 }
 
 void MapOptimization::transformUpdate() {
-  if (imuPointerLast >= 0) {
-    float imuRollLast = 0, imuPitchLast = 0;
-    while (imuPointerFront != imuPointerLast) {
-      if (timeLaserOdometry + _scan_period < imuTime[imuPointerFront]) {
-        break;
-      }
-      imuPointerFront = (imuPointerFront + 1) % imuQueLength;
-    }
-
-    if (timeLaserOdometry + _scan_period > imuTime[imuPointerFront]) {
-      imuRollLast = imuRoll[imuPointerFront];
-      imuPitchLast = imuPitch[imuPointerFront];
-    } else {
-      int imuPointerBack = (imuPointerFront + imuQueLength - 1) % imuQueLength;
-      float ratioFront =
-          (timeLaserOdometry + _scan_period - imuTime[imuPointerBack]) /
-          (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-      float ratioBack =
-          (imuTime[imuPointerFront] - timeLaserOdometry - _scan_period) /
-          (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-
-      imuRollLast = imuRoll[imuPointerFront] * ratioFront +
-                    imuRoll[imuPointerBack] * ratioBack;
-      imuPitchLast = imuPitch[imuPointerFront] * ratioFront +
-                     imuPitch[imuPointerBack] * ratioBack;
-    }
-
-    transformTobeMapped[0] =
-        0.998 * transformTobeMapped[0] + 0.002 * imuPitchLast;
-    transformTobeMapped[2] =
-        0.998 * transformTobeMapped[2] + 0.002 * imuRollLast;
-  }
 
   for (int i = 0; i < 6; i++) {
     transformBefMapped[i] = transformSum[i];
@@ -535,25 +491,6 @@ pcl::PointCloud<PointType>::Ptr MapOptimization::transformPointCloud(
   return cloudOut;
 }
 
-void MapOptimization::imuHandler(const sensor_msgs::Imu::ConstPtr &imuIn) {
-
-  if( imuIn->orientation.x == 0 && imuIn->orientation.y == 0 &&
-      imuIn->orientation.z == 0 && imuIn->orientation.w == 0 )
-  {
-    ROS_WARN_THROTTLE(1, "invalid IMU orientation. rejected");
-    return;
-  }
-
-  double roll, pitch, yaw;
-  tf::Quaternion orientation;
-  tf::quaternionMsgToTF(imuIn->orientation, orientation);
-  tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-
-  imuPointerLast = (imuPointerLast + 1) % imuQueLength;
-  imuTime[imuPointerLast] = imuIn->header.stamp.toSec();
-  imuRoll[imuPointerLast] = roll;
-  imuPitch[imuPointerLast] = pitch;
-}
 
 void MapOptimization::publishTF() {
   geometry_msgs::Quaternion geoQuat = tf::createQuaternionMsgFromRollPitchYaw(
@@ -977,7 +914,7 @@ void MapOptimization::cornerOptimization(int iterCount) {
     pointOri = laserCloudCornerLastDS->points[i];
     pointAssociateToMap(&pointOri, &pointSel);
     kdtreeCornerFromMap.nearestKSearch(pointSel, 5, pointSearchInd,
-                                        pointSearchSqDis);
+                                       pointSearchSqDis);
 
     if (pointSearchSqDis[4] < 1.0) {
       float cx = 0, cy = 0, cz = 0;

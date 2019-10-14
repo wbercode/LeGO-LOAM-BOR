@@ -39,7 +39,6 @@ class MapOptimization {
 
   ~MapOptimization();
 
-  void imuHandler(const sensor_msgs::Imu::ConstPtr &imuIn);
   void run();
 
  private:
@@ -82,8 +81,6 @@ class MapOptimization {
   ros::Publisher pubHistoryKeyFrames;
   ros::Publisher pubIcpKeyFrames;
   ros::Publisher pubRecentKeyFrames;
-
-  ros::Subscriber subImu;
 
   nav_msgs::Odometry odomAftMapped;
   tf::StampedTransform aftMappedTrans;
@@ -189,14 +186,6 @@ class MapOptimization {
   float transformBefMapped[6];
   float transformAftMapped[6];
 
-  int imuPointerFront;
-  int imuPointerLast;
-
-  enum { imuQueLength = 200 };
-
-  double imuTime[imuQueLength];
-  float imuRoll[imuQueLength];
-  float imuPitch[imuQueLength];
 
   std::mutex mtx;
 
