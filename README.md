@@ -61,7 +61,7 @@ catkin_make
 
 ## The system
 
-LeGO-LOAM is speficifally optimized for a horizontally placed lidar on a ground vehicle. It assumes there is always a ground plane in the scan. The UGV we are using is Clearpath Jackal. It has a built-in IMU.
+LeGO-LOAM is speficifally optimized for a horizontally placed lidar on a ground vehicle. It assumes there is always a ground plane in the scan. The UGV we are using is Clearpath Jackal.
 
 <p align='center'>
     <img src="/LeGO-LOAM/launch/jackal-label.jpg" alt="drawing" width="400"/>
@@ -88,25 +88,20 @@ If you want to use our algorithm with Velodyne VLP-32c or HDL-64e, you need to w
 
 If the point cloud is not projected properly, you will lose many points and performance.
 
-If you are using your lidar with an IMU, make sure your IMU is aligned properly with the lidar.
-The algorithm uses IMU data to correct the point cloud distortion that is cause by sensor motion.
-
-**If the IMU is not aligned properly, the usage of IMU data will deteriorate the result.**
-
-This limitation will be fixed in the future.
+**The IMU has been remove from the original code.** Deal with it.
 
 ## Run the package
 
 You may process a rosbag using the following command:
 
 ```
-roslaunch lego_loam_bor run.launch rosbag:=/path/to/your/rosbag lidar_topic:=/velodyne_points imu_topic:=/imu/data
+roslaunch lego_loam_bor run.launch rosbag:=/path/to/your/rosbag lidar_topic:=/velodyne_points
 ```
 
-Change the parameters `rosbag`, `lidar_topic` and `imu_topic` as needed.
+Change the parameters `rosbag`, `lidar_topic` as needed.
 
 
-Notes: Though /imu/data is optional, it can improve estimation accuracy greatly if provided. Some sample bags can be downloaded from [here](https://github.com/RobustFieldAutonomyLab/jackal_dataset_20170608).
+Some sample bags can be downloaded from [here](https://github.com/RobustFieldAutonomyLab/jackal_dataset_20170608).
 
 ## New data-set
 
