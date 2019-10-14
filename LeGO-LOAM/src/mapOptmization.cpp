@@ -80,9 +80,6 @@ MapOptimization::MapOptimization(ros::NodeHandle &node,
   odomAftMapped.header.frame_id = "/camera_init";
   odomAftMapped.child_frame_id = "/aft_mapped";
 
-  aftMappedTrans.frame_id_ = "/camera_init";
-  aftMappedTrans.child_frame_id_ = "/aft_mapped";
-
   nh.getParam("/lego_loam/laser/scan_period", _scan_period);
 
   nh.getParam("/lego_loam/mapping/enable_loop_closure", _loop_closure_enabled);
@@ -471,12 +468,16 @@ void MapOptimization::publishTF() {
   odomAftMapped.twist.twist.linear.z = transformBefMapped[5];
   pubOdomAftMapped.publish(odomAftMapped);
 
-  aftMappedTrans.stamp_ = ros::Time().fromSec(timeLaserOdometry);
-  aftMappedTrans.setRotation(
+  tf::StampedTransform tranf_msg;
+  tranf_msg.frame_id_ = "/camera_init";
+  tranf_msg.child_frame_id_ = "/aft_mapped";
+
+  tranf_msg.stamp_ = ros::Time().fromSec(timeLaserOdometry);
+  tranf_msg.setRotation(
       tf::Quaternion(-geoQuat.y, -geoQuat.z, geoQuat.x, geoQuat.w));
-  aftMappedTrans.setOrigin(tf::Vector3(
+  tranf_msg.setOrigin(tf::Vector3(
       transformAftMapped[3], transformAftMapped[4], transformAftMapped[5]));
-  tfBroadcaster.sendTransform(aftMappedTrans);
+  tfBroadcaster.sendTransform(tranf_msg);
 }
 
 void MapOptimization::publishKeyPosesAndFrames() {

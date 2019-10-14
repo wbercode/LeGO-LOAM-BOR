@@ -83,7 +83,7 @@ class MapOptimization {
   ros::Publisher pubRecentKeyFrames;
 
   nav_msgs::Odometry odomAftMapped;
-  tf::StampedTransform aftMappedTrans;
+
   tf::TransformBroadcaster tfBroadcaster;
 
   std::vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;
@@ -217,9 +217,6 @@ class MapOptimization {
   int latestFrameIDLoopCloure;
 
   bool aLoopIsClosed;
-
-  float cRoll, sRoll, cPitch, sPitch, cYaw, sYaw, tX, tY, tZ;
-  float ctRoll, stRoll, ctPitch, stPitch, ctYaw, stYaw, tInX, tInY, tInZ;
 
  private:
   void allocateMemory();
