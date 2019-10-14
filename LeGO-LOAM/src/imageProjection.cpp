@@ -418,26 +418,25 @@ void ImageProjection::labelComponents(int row, int col) {
 }
 
 void ImageProjection::publishClouds() {
-  const auto& cloudHeader = _seg_msg.header;
 
-  sensor_msgs::PointCloud2 laserCloudTemp;
+  sensor_msgs::PointCloud2 temp;
+  temp.header.stamp = _seg_msg.header.stamp;
+  temp.header.frame_id = "base_link";
 
-  auto PublishCloud = [&](ros::Publisher& pub,
+  auto PublishCloud = [](ros::Publisher& pub, sensor_msgs::PointCloud2& temp,
                           const pcl::PointCloud<PointType>::Ptr& cloud) {
     if (pub.getNumSubscribers() != 0) {
-      pcl::toROSMsg(*cloud, laserCloudTemp);
-      laserCloudTemp.header.stamp = cloudHeader.stamp;
-      laserCloudTemp.header.frame_id = "base_link";
-      pub.publish(laserCloudTemp);
+      pcl::toROSMsg(*cloud, temp);
+      pub.publish(temp);
     }
   };
 
-  PublishCloud(_pub_outlier_cloud, _outlier_cloud);
-  PublishCloud(_pub_segmented_cloud, _segmented_cloud);
-  PublishCloud(_pub_full_cloud, _full_cloud);
-  PublishCloud(_pub_ground_cloud, _ground_cloud);
-  PublishCloud(_pub_segmented_cloud_pure, _segmented_cloud_pure);
-  PublishCloud(_pub_full_info_cloud, _full_info_cloud);
+  PublishCloud(_pub_outlier_cloud, temp, _outlier_cloud);
+  PublishCloud(_pub_segmented_cloud, temp, _segmented_cloud);
+  PublishCloud(_pub_full_cloud, temp, _full_cloud);
+  PublishCloud(_pub_ground_cloud, temp, _ground_cloud);
+  PublishCloud(_pub_segmented_cloud_pure, temp, _segmented_cloud_pure);
+  PublishCloud(_pub_full_info_cloud, temp, _full_info_cloud);
 
   if (_pub_segmented_cloud_info.getNumSubscribers() != 0) {
     _pub_segmented_cloud_info.publish(_seg_msg);

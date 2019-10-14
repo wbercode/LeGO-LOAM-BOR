@@ -48,10 +48,6 @@ class MapOptimization {
   gtsam::ISAM2 *isam;
   gtsam::Values isamCurrentEstimate;
 
-  gtsam::noiseModel::Diagonal::shared_ptr priorNoise;
-  gtsam::noiseModel::Diagonal::shared_ptr odometryNoise;
-  gtsam::noiseModel::Diagonal::shared_ptr constraintNoise;
-
   ros::NodeHandle& nh;
   bool _loop_closure_enabled;
   float _scan_period;

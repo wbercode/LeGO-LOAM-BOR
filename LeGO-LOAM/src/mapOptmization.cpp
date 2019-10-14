@@ -192,10 +192,6 @@ void MapOptimization::allocateMemory() {
     transformAftMapped[i] = 0;
   }
 
-  gtsam::Vector Vector6(6);
-  Vector6 << 1e-6, 1e-6, 1e-6, 1e-8, 1e-8, 1e-6;
-  priorNoise = noiseModel::Diagonal::Variances(Vector6);
-  odometryNoise = noiseModel::Diagonal::Variances(Vector6);
 
   matA0.setZero();
   matB0.fill(-1);
@@ -730,7 +726,7 @@ void MapOptimization::performLoopClosure() {
   float noiseScore = icp.getFitnessScore();
   Vector6 << noiseScore, noiseScore, noiseScore, noiseScore, noiseScore,
       noiseScore;
-  constraintNoise = noiseModel::Diagonal::Variances(Vector6);
+  auto constraintNoise = noiseModel::Diagonal::Variances(Vector6);
   /*
           add constraints
           */
@@ -775,9 +771,9 @@ void MapOptimization::extractSurroundingKeyFrames() {
       }
     } else {  // queue is full, pop the oldest key frame and push the latest
               // key frame
-      if (latestFrameID != cloudKeyPoses3D->points.size() -
-                               1) {  // if the robot is not moving, no need to
-                                     // update recent frames
+      if (latestFrameID != cloudKeyPoses3D->points.size()-1) {
+        // if the robot is not moving, no need to
+        // update recent frames
 
         recentCornerCloudKeyFrames.pop_front();
         recentSurfCloudKeyFrames.pop_front();
@@ -1217,6 +1213,11 @@ void MapOptimization::saveKeyFramesAndFactor() {
   currentRobotPosPoint.x = transformAftMapped[3];
   currentRobotPosPoint.y = transformAftMapped[4];
   currentRobotPosPoint.z = transformAftMapped[5];
+
+  gtsam::Vector Vector6(6);
+  Vector6 << 1e-6, 1e-6, 1e-6, 1e-8, 1e-8, 1e-6;
+  auto priorNoise = noiseModel::Diagonal::Variances(Vector6);
+  auto odometryNoise = noiseModel::Diagonal::Variances(Vector6);
 
   bool saveThisKeyFrame = true;
   if (sqrt((previousRobotPosPoint.x - currentRobotPosPoint.x) *
