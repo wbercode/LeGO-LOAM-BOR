@@ -183,15 +183,6 @@ void MapOptimization::allocateMemory() {
   timeLastGloalMapPublish = 0;
   timeLastProcessing = -1;
 
-  for (int i = 0; i < 6; ++i) {
-    transformLast[i] = 0;
-    transformSum[i] = 0;
-    transformIncre[i] = 0;
-    transformTobeMapped[i] = 0;
-    transformBefMapped[i] = 0;
-    transformAftMapped[i] = 0;
-  }
-
   gtsam::Vector Vector6(6);
   Vector6 << 1e-6, 1e-6, 1e-6, 1e-8, 1e-8, 1e-6;
   priorNoise = noiseModel::Diagonal::Variances(Vector6);
@@ -373,42 +364,10 @@ void MapOptimization::transformAssociateToMap() {
 
 void MapOptimization::transformUpdate() {
 
-  for (int i = 0; i < 6; i++) {
-    transformBefMapped[i] = transformSum[i];
-    transformAftMapped[i] = transformTobeMapped[i];
-  }
+  transformBefMapped = transformSum;
+  transformAftMapped = transformTobeMapped;
 }
 
-void MapOptimization::updatePointAssociateToMapSinCos() {
-  cRoll = cos(transformTobeMapped[0]);
-  sRoll = sin(transformTobeMapped[0]);
-
-  cPitch = cos(transformTobeMapped[1]);
-  sPitch = sin(transformTobeMapped[1]);
-
-  cYaw = cos(transformTobeMapped[2]);
-  sYaw = sin(transformTobeMapped[2]);
-
-  tX = transformTobeMapped[3];
-  tY = transformTobeMapped[4];
-  tZ = transformTobeMapped[5];
-}
-
-void MapOptimization::pointAssociateToMap(PointType const *const pi,
-                                          PointType *const po) {
-  float x1 = cYaw * pi->x - sYaw * pi->y;
-  float y1 = sYaw * pi->x + cYaw * pi->y;
-  float z1 = pi->z;
-
-  float x2 = x1;
-  float y2 = cRoll * y1 - sRoll * z1;
-  float z2 = sRoll * y1 + cRoll * z1;
-
-  po->x = cPitch * x2 + sPitch * z2 + tX;
-  po->y = y2 + tY;
-  po->z = -sPitch * x2 + cPitch * z2 + tZ;
-  po->intensity = pi->intensity;
-}
 
 void MapOptimization::updateTransformPointCloudSinCos(PointTypePose *tIn) {
   ctRoll = cos(tIn->roll);
@@ -909,10 +868,12 @@ void MapOptimization::downsampleCurrentScan() {
 }
 
 void MapOptimization::cornerOptimization(int iterCount) {
-  updatePointAssociateToMapSinCos();
+
+  auto map_transform = TransformZXYT(transformTobeMapped);
+
   for (int i = 0; i < laserCloudCornerLastDSNum; i++) {
     pointOri = laserCloudCornerLastDS->points[i];
-    pointAssociateToMap(&pointOri, &pointSel);
+    pointSel = TransformPoint(map_transform, pointOri);
     kdtreeCornerFromMap.nearestKSearch(pointSel, 5, pointSearchInd,
                                        pointSearchSqDis);
 
@@ -1017,10 +978,12 @@ void MapOptimization::cornerOptimization(int iterCount) {
 }
 
 void MapOptimization::surfOptimization(int iterCount) {
-  updatePointAssociateToMapSinCos();
+
+  auto map_transform = TransformZXYT(transformTobeMapped);
+
   for (int i = 0; i < laserCloudSurfTotalLastDSNum; i++) {
     pointOri = laserCloudSurfTotalLastDS->points[i];
-    pointAssociateToMap(&pointOri, &pointSel);
+    pointSel = TransformPoint(map_transform, pointOri);
     kdtreeSurfFromMap.nearestKSearch(pointSel, 5, pointSearchInd,
                                       pointSearchSqDis);
 
@@ -1174,12 +1137,12 @@ bool MapOptimization::LMOptimization(int iterCount) {
     matX = matP * matX2;
   }
 
-  transformTobeMapped[0] += matX(0, 0);
-  transformTobeMapped[1] += matX(1, 0);
-  transformTobeMapped[2] += matX(2, 0);
-  transformTobeMapped[3] += matX(3, 0);
-  transformTobeMapped[4] += matX(4, 0);
-  transformTobeMapped[5] += matX(5, 0);
+  transformTobeMapped.rot.roll  += matX(0, 0);
+  transformTobeMapped.rot.pitch += matX(1, 0);
+  transformTobeMapped.rot.yaw   += matX(2, 0);
+  transformTobeMapped.pos.x()   += matX(3, 0);
+  transformTobeMapped.pos.y()   += matX(4, 0);
+  transformTobeMapped.pos.z()   += matX(5, 0);
 
   float deltaR = sqrt(pow(pcl::rad2deg(matX(0, 0)), 2) +
                       pow(pcl::rad2deg(matX(1, 0)), 2) +
@@ -1214,9 +1177,9 @@ void MapOptimization::scan2MapOptimization() {
 }
 
 void MapOptimization::saveKeyFramesAndFactor() {
-  currentRobotPosPoint.x = transformAftMapped[3];
-  currentRobotPosPoint.y = transformAftMapped[4];
-  currentRobotPosPoint.z = transformAftMapped[5];
+  currentRobotPosPoint.x = transformAftMapped.pos.x();
+  currentRobotPosPoint.y = transformAftMapped.pos.y();
+  currentRobotPosPoint.z = transformAftMapped.pos.z();
 
   bool saveThisKeyFrame = true;
   if (sqrt((previousRobotPosPoint.x - currentRobotPosPoint.x) *
@@ -1234,38 +1197,25 @@ void MapOptimization::saveKeyFramesAndFactor() {
   /**
    * update grsam graph
    */
+  auto toPose3 = [](const Transform& trans){
+    return Pose3(Rot3::RzRyRx(trans.rot.yaw, trans.rot.roll, trans.rot.pitch),
+                 Point3(trans.pos.z(), trans.pos.x(),trans.pos.y()));
+  };
+
   if (cloudKeyPoses3D->points.empty()) {
-    gtSAMgraph.add(PriorFactor<Pose3>(
-        0,
-        Pose3(Rot3::RzRyRx(transformTobeMapped[2], transformTobeMapped[0],
-                           transformTobeMapped[1]),
-              Point3(transformTobeMapped[5], transformTobeMapped[3],
-                     transformTobeMapped[4])),
-        priorNoise));
-    initialEstimate.insert(
-        0, Pose3(Rot3::RzRyRx(transformTobeMapped[2], transformTobeMapped[0],
-                              transformTobeMapped[1]),
-                 Point3(transformTobeMapped[5], transformTobeMapped[3],
-                        transformTobeMapped[4])));
-    for (int i = 0; i < 6; ++i) transformLast[i] = transformTobeMapped[i];
+    gtSAMgraph.add(PriorFactor<Pose3>( 0, toPose3(transformTobeMapped), priorNoise));
+    initialEstimate.insert( 0, toPose3(transformTobeMapped));
+    transformLast = transformTobeMapped;
+
   } else {
-    gtsam::Pose3 poseFrom = Pose3(
-        Rot3::RzRyRx(transformLast[2], transformLast[0], transformLast[1]),
-        Point3(transformLast[5], transformLast[3], transformLast[4]));
-    gtsam::Pose3 poseTo =
-        Pose3(Rot3::RzRyRx(transformAftMapped[2], transformAftMapped[0],
-                           transformAftMapped[1]),
-              Point3(transformAftMapped[5], transformAftMapped[3],
-                     transformAftMapped[4]));
+    gtsam::Pose3 poseFrom = toPose3(transformLast);
+    gtsam::Pose3 poseTo = toPose3(transformAftMapped);
     gtSAMgraph.add(BetweenFactor<Pose3>(
         cloudKeyPoses3D->points.size() - 1, cloudKeyPoses3D->points.size(),
         poseFrom.between(poseTo), odometryNoise));
     initialEstimate.insert(
         cloudKeyPoses3D->points.size(),
-        Pose3(Rot3::RzRyRx(transformAftMapped[2], transformAftMapped[0],
-                           transformAftMapped[1]),
-              Point3(transformAftMapped[5], transformAftMapped[3],
-                     transformAftMapped[4])));
+        toPose3(transformAftMapped));
   }
   /**
    * update iSAM
@@ -1314,10 +1264,8 @@ void MapOptimization::saveKeyFramesAndFactor() {
     transformAftMapped[4] = latestEstimate.translation().z();
     transformAftMapped[5] = latestEstimate.translation().x();
 
-    for (int i = 0; i < 6; ++i) {
-      transformLast[i] = transformAftMapped[i];
-      transformTobeMapped[i] = transformAftMapped[i];
-    }
+    transformLast = transformAftMapped;
+    transformTobeMapped = transformAftMapped;
   }
 
   pcl::PointCloud<PointType>::Ptr thisCornerKeyFrame(

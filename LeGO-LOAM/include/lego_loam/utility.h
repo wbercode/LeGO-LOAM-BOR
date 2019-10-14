@@ -40,10 +40,10 @@
 #include <array>
 #include <thread>
 #include <mutex>
+#include "lego_loam/math_utils.h"
 
 typedef pcl::PointXYZI  PointType;
 
-typedef Eigen::Vector3f Vector3;
 
 const double DEG_TO_RAD = M_PI / 180.0;
 
@@ -75,34 +75,21 @@ struct AssociationOut
   nav_msgs::Odometry laser_odometry;
 };
 
-struct RollPitchYaw{
-  double roll;
-  double pitch;
-  double yaw;
-  RollPitchYaw():roll(0),pitch(0),yaw(0) {}
-};
-
-struct Transform
-{
-  Transform():pos(Vector3::Zero()) {}
-  Vector3 pos;
-  RollPitchYaw rot;
-};
 
 inline void OdometryToTransform(const nav_msgs::Odometry& odometry,
-                                float* transform) {
+                                Transform& transform) {
   double roll, pitch, yaw;
   geometry_msgs::Quaternion geoQuat = odometry.pose.pose.orientation;
   tf::Matrix3x3(tf::Quaternion(geoQuat.z, -geoQuat.x, -geoQuat.y, geoQuat.w))
       .getRPY(roll, pitch, yaw);
 
-  transform[0] = -pitch;
-  transform[1] = -yaw;
-  transform[2] = roll;
+  transform.rot.roll = -pitch;
+  transform.rot.pitch = -yaw;
+  transform.rot.yaw = roll;
 
-  transform[3] = odometry.pose.pose.position.x;
-  transform[4] = odometry.pose.pose.position.y;
-  transform[5] = odometry.pose.pose.position.z;
+  transform.pos.x() = odometry.pose.pose.position.x;
+  transform.pos.y() = odometry.pose.pose.position.y;
+  transform.pos.z() = odometry.pose.pose.position.z;
 }
 
 /*
@@ -127,5 +114,18 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRPYT,
 )
 
 typedef PointXYZIRPYT  PointTypePose;
+
+
+inline PointType TransformPoint(const Eigen::Affine3f& mat, const PointType& p )
+{
+  Vector3 v0(p.x, p.y, p.z);
+  Vector3 v1 = mat*v0;
+  PointType out;
+  out.x = v1.x();
+  out.y = v1.y();
+  out.z = v1.z();
+  out.intensity = p.intensity;
+  return out;
+}
 
 #endif

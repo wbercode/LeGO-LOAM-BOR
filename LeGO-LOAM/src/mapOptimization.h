@@ -179,13 +179,12 @@ class MapOptimization {
   double timeLaserOdometry;
   double timeLastGloalMapPublish;
 
-  float transformLast[6];
-  float transformSum[6];
-  float transformIncre[6];
-  float transformTobeMapped[6];
-  float transformBefMapped[6];
-  float transformAftMapped[6];
-
+  Transform transformLast;
+  Transform transformSum;
+  Transform transformIncre;
+  Transform transformTobeMapped;
+  Transform transformBefMapped;
+  Transform transformAftMapped;
 
   std::mutex mtx;
 
@@ -226,8 +225,6 @@ class MapOptimization {
   void allocateMemory();
   void transformAssociateToMap();
   void transformUpdate();
-  void updatePointAssociateToMapSinCos();
-  void pointAssociateToMap(PointType const *const pi, PointType *const po);
   void updateTransformPointCloudSinCos(PointTypePose *tIn) ;
 
   pcl::PointCloud<PointType>::Ptr transformPointCloud(
