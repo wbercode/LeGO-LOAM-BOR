@@ -95,9 +95,9 @@ struct Transform
     if (std::isnan(pos.x())) pos.x() = 0;
     if (std::isnan(pos.y())) pos.y() = 0;
     if (std::isnan(pos.z())) pos.z() = 0;
-    if (std::isnan(rot.roll()))  rot.roll() = 0;
-    if (std::isnan(rot.pitch())) rot.pitch() = 0;
-    if (std::isnan(rot.yaw()))   rot.yaw() = 0;
+    if (std::isnan(rot.roll))  rot.roll = 0;
+    if (std::isnan(rot.pitch)) rot.pitch = 0;
+    if (std::isnan(rot.yaw))   rot.yaw = 0;
   }
 };
 
