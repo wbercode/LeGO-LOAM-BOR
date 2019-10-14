@@ -1,7 +1,7 @@
 #ifndef TRANSFORMFUSION_H
 #define TRANSFORMFUSION_H
 
-#include "utility.h"
+#include "lego_loam/utility.h"
 
 class TransformFusion {
  private:

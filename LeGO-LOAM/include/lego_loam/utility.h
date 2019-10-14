@@ -75,6 +75,20 @@ struct AssociationOut
   nav_msgs::Odometry laser_odometry;
 };
 
+struct RollPitchYaw{
+  double roll;
+  double pitch;
+  double yaw;
+  RollPitchYaw():roll(0),pitch(0),yaw(0) {}
+};
+
+struct Transform
+{
+  Transform():pos(Vector3::Zero()) {}
+  Vector3 pos;
+  RollPitchYaw rot;
+};
+
 inline void OdometryToTransform(const nav_msgs::Odometry& odometry,
                                 float* transform) {
   double roll, pitch, yaw;

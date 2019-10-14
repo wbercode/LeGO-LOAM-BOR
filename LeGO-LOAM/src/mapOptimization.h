@@ -1,9 +1,9 @@
 #ifndef MAPOPTIMIZATION_H
 #define MAPOPTIMIZATION_H
 
-#include "utility.h"
-#include "channel.h"
-#include "nanoflann_pcl.h"
+#include "lego_loam/utility.h"
+#include "lego_loam/channel.h"
+#include "lego_loam/nanoflann_pcl.h"
 
 #include <gtsam/geometry/Pose3.h>
 #include <gtsam/geometry/Rot3.h>

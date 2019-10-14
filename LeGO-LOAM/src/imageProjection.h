@@ -1,8 +1,8 @@
 #ifndef IMAGEPROJECTION_H
 #define IMAGEPROJECTION_H
 
-#include "utility.h"
-#include "channel.h"
+#include "lego_loam/utility.h"
+#include "lego_loam/channel.h"
 #include <Eigen/QR>
 
 class ImageProjection {
