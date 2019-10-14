@@ -80,6 +80,8 @@ struct RollPitchYaw{
   double pitch;
   double yaw;
   RollPitchYaw():roll(0),pitch(0),yaw(0) {}
+  RollPitchYaw(double r, double p, double y):
+   roll(r),pitch(p),yaw(y) {}
 };
 
 struct Transform
@@ -87,6 +89,16 @@ struct Transform
   Transform():pos(Vector3::Zero()) {}
   Vector3 pos;
   RollPitchYaw rot;
+
+  void correctNAN()
+  {
+    if (std::isnan(pos.x())) pos.x() = 0;
+    if (std::isnan(pos.y())) pos.y() = 0;
+    if (std::isnan(pos.z())) pos.z() = 0;
+    if (std::isnan(rot.roll()))  rot.roll() = 0;
+    if (std::isnan(rot.pitch())) rot.pitch() = 0;
+    if (std::isnan(rot.yaw()))   rot.yaw() = 0;
+  }
 };
 
 inline void OdometryToTransform(const nav_msgs::Odometry& odometry,
@@ -127,5 +139,33 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRPYT,
 )
 
 typedef PointXYZIRPYT  PointTypePose;
+
+inline Vector3 ApplyRotationRoll(const Vector3& p, double roll)
+{
+  double Cos = cos(roll);
+  double Sin = sin(roll);
+  return {p.x(),
+          Cos * p.y() - Sin* p.z(),
+          Sin * p.y() + Cos* p.z() };
+}
+
+inline Vector3 ApplyRotationPitch(const Vector3& p, double pitch)
+{
+  double Cos = cos(pitch);
+  double Sin = sin(pitch);
+  return { Cos * p.x() + Sin* p.z(),
+           p.y(),
+          -Sin * p.x() + Cos* p.z()
+  };
+}
+
+inline Vector3 ApplyRotationYaw(const Vector3& p, double yaw)
+{
+  double Cos = cos(yaw);
+  double Sin = sin(yaw);
+  return { Cos * p.x() - Sin* p.y(),
+          Sin * p.x() + Cos* p.y(),
+          p.z() };
+}
 
 #endif

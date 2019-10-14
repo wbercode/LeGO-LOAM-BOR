@@ -76,10 +76,9 @@ class FeatureAssociation {
   int imuPointerLast;
   int imuPointerLastIteration;
 
-  float imuRollStart, imuPitchStart, imuYawStart;
-  float cosImuRollStart, cosImuPitchStart, cosImuYawStart, sinImuRollStart,
-      sinImuPitchStart, sinImuYawStart;
-  float imuRollCur, imuPitchCur, imuYawCur;
+  RollPitchYaw imuStart;
+  RollPitchYaw imuCur;
+  RollPitchYaw imuLast;
 
   Vector3 imuVeloStart;
   Vector3 imuShiftStart;
@@ -95,9 +94,7 @@ class FeatureAssociation {
   Vector3 imuAngularFromStart;
 
   double imuTime[imuQueLength];
-  float imuRoll[imuQueLength];
-  float imuPitch[imuQueLength];
-  float imuYaw[imuQueLength];
+  RollPitchYaw imu[imuQueLength];
 
   Vector3 imuAcc[imuQueLength];
   Vector3 imuVelo[imuQueLength];
@@ -125,10 +122,9 @@ class FeatureAssociation {
   std::vector<float> pointSearchSurfInd2;
   std::vector<float> pointSearchSurfInd3;
 
-  float transformCur[6];
-  float transformSum[6];
+  Transform transformCur;
+  Transform transformSum;
 
-  float imuRollLast, imuPitchLast, imuYawLast;
   Vector3 imuShiftFromStart;
   Vector3 imuVeloFromStart;
 
@@ -155,7 +151,6 @@ class FeatureAssociation {
 
  private:
   void initializationValue();
-  void updateImuRollPitchYawStartSinCos();
   void ShiftToStartIMU(float pointTime);
   void VeloToStartIMU();
   void TransformToStartIMU(PointType *p);
